@@ -281,7 +281,7 @@ async function scheduleAlerts() {
     const list = []; let id = 1;
     if (S.notif) for (const e of ev.slice(0, 120)) {
       const nm = pName(e.prayer), sound = alarmOn(e.prayer);
-      list.push({ id: id++, title: nm, body: p.name, channelId: sound ? "adhan_sound" : "adhan", sound: sound ? "adhan.wav" : undefined, isExactNotification: exactOK, schedule: { at: new Date(e.date), allowWhileIdle: true } });
+      list.push({ id: id++, title: ar() && e.prayer !== "sunrise" ? "صلاة " + nm : nm, body: p.name, channelId: sound ? "adhan_sound" : "adhan", sound: sound ? "adhan.wav" : undefined, isExactNotification: exactOK, schedule: { at: new Date(e.date), allowWhileIdle: true } });
       if (S.remind > 0 && e.date - S.remind * 60000 > now)
         list.push({ id: id++, title: ar() ? `${nm} بعد ${S.remind} دقيقة` : F("{0} in {1} minutes", nm, S.remind), body: p.name, channelId: "adhan", isExactNotification: exactOK, schedule: { at: new Date(e.date - S.remind * 60000), allowWhileIdle: true } });
     }
@@ -295,19 +295,20 @@ function azkarReminders(now) {
   syncAzkarResets();
   const p = S.place, M = 60000, out = [];
   const body = ar() ? "لم تكتمل بعد، اضغط للمتابعة" : L("Not finished yet. Tap to continue.");
+  const AZN = ar() ? ["أذكار الصباح", "أذكار المساء", "أذكار بعد الصلاة"] : [L("Morning azkar"), L("Evening azkar"), L("After-prayer azkar")];
   const ev = prayerEvents(now, p.lat, p.lon, p.tz, method(), S.hanafi, offs(), 7).all;
   const next = (e, name) => ev.find(x => x.prayer === name && x.date > e.date);
   for (const e of ev) {
     if (e.prayer === "fajr" && S.azMorning) {
       const end = next(e, "dhuhr"), done = azStamp.morning === e.date && catDone("morning");
-      if (end && !done) for (let t = e.date + 15 * M; t < end.date; t += 120 * M) if (t > now) out.push({ at: t, cat: 0, title: catTitle(0), body });
+      if (end && !done) for (let t = e.date + 15 * M; t < end.date; t += 120 * M) if (t > now) out.push({ at: t, cat: 0, title: AZN[0], body });
     }
     if (e.prayer === "asr" && S.azEvening) {
       const end = next(e, "isha"), done = azStamp.evening === e.date && catDone("evening");
-      if (end && !done) for (let t = e.date + 15 * M; t < end.date; t += 120 * M) if (t > now) out.push({ at: t, cat: 1, title: catTitle(1), body });
+      if (end && !done) for (let t = e.date + 15 * M; t < end.date; t += 120 * M) if (t > now) out.push({ at: t, cat: 1, title: AZN[1], body });
     }
     if (S.azPrayer && e.prayer !== "sunrise" && e.date + 15 * M > now && !(azStamp.afterPrayer === e.date && catDone("afterPrayer")))
-      out.push({ at: e.date + 15 * M, cat: 2, title: catTitle(2), body: `${pName(e.prayer)} · ${body}` });
+      out.push({ at: e.date + 15 * M, cat: 2, title: AZN[2], body: `${pName(e.prayer)} · ${body}` });
   }
   return out.slice(0, 150);
 }

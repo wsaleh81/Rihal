@@ -6,6 +6,8 @@ import android.os.Looper;
 import android.view.KeyEvent;
 import android.webkit.WebView;
 
+import androidx.activity.EdgeToEdge;
+
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -18,6 +20,9 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CompassPlugin.class);
         registerPlugin(RihalWidgetPlugin.class);
+        // Draw behind the status and navigation bars on every Android version (as Android 15+ already does),
+        // so the page's safe-area padding is not added on top of the system's own space (gap under the tab bar).
+        EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
     }
 

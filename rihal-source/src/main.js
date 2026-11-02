@@ -736,8 +736,8 @@ function viewSettings() {
     ${seg("appearance", [["auto", L("Auto")], ["light", L("Light")], ["dark", L("Dark")]], S.appearance)}
     <div class="srow irow nob"><span class="sic">${SIC.compass}</span><div class="sl">${L("Compass style")}</div></div>
     ${seg("compass", [["classic", L("Classic")], ["rings", L("Rings")]], S.compass === "rings" ? "rings" : "classic")}<div style="height:12px"></div>`)}
-  ${sgroup("accessibility", irow("size", L("Text size"), sel("textSize", tsizes, S.textSize)) + irow("book", L("Azkhar text size"), sel("azkarSize", asizes, S.azkarSize)) + irow("bold", L("Bold text"), tog("bold", S.bold)))}
-  ${sgroup("language", irow("globe", L("Application language"), sel("lang", LANGS, S.lang)) + irow("font", L("App font"), sel("fontID", FONTS.map(([v, t]) => [v, v === "system" ? L("System default") : t]), S.fontID)))}
+  ${sgroup("Language & text", irow("globe", L("Application language"), sel("lang", LANGS, S.lang)) + irow("font", L("App font"), sel("fontID", FONTS.map(([v, t]) => [v, v === "system" ? L("System default") : t]), S.fontID))
+    + irow("size", L("Text size"), sel("textSize", tsizes, S.textSize)) + irow("book", L("Azkhar text size"), sel("azkarSize", asizes, S.azkarSize)) + irow("bold", L("Bold text"), tog("bold", S.bold)))}
   ${sgroup("prayers", irow("loc", L("Current location"), S.gps ? chk : "", esc(S.gps ? p.name : L("Use my location")), 'data-act="gps"')
     + irow("pin", L("Choose a city"), (S.gps ? "" : chk) + chev, S.gps ? "" : esc(p.name), 'data-act="picker"')
     + irow("clock", L("Local time"), `<b class="muted tnum">${tf(p.tz).format(new Date())} · ${gmt(p.tz)}</b>`)
@@ -746,18 +746,18 @@ function viewSettings() {
     + irow("pm", L("Adjust times"), `<span class="muted">${L("minutes")}</span>` + chev, "", 'data-act="setOffsets"')
     + irow("sun", L("Hanafi Asr"), tog("hanafi", S.hanafi))
     + irow("eye", L("Show current prayer (Now)"), tog("showNow", S.showNow !== false)))}
-  ${sgroup("notifications", irow("bell", L("Adhan alerts"), tog("notif", S.notif))
+  ${sgroup("Notifications & reminders", irow("bell", L("Adhan alerts"), tog("notif", S.notif))
     + (S.notif && alertsDenied ? `<div class="snote">${ar() ? "التنبيهات مغلقة لهذا التطبيق في إعدادات الجهاز. فعّلها من إعدادات الهاتف ← التطبيقات ← رحّال ← الإشعارات." : esc(F("Notifications are off for this app in device settings. ")) + esc(L("Turn them on in phone Settings → Apps → Rihal → Notifications."))}</div>` : "")
     + (S.notif && !alertsDenied && !exactOK ? `<div class="snote">${ar() ? "قد تتأخر التنبيهات بضع دقائق. للتنبيه في الدقيقة نفسها اسمح بـ «المنبّهات والتذكيرات»." : esc(L("Alerts may arrive a few minutes late. For the exact minute, allow Alarms & reminders."))} <button class="linkb" data-act="askExact">${ar() ? "السماح" : L("Allow")}</button></div>` : "")
     + irow("speaker", ar() ? "صوت الأذان" : L("Adhan sound"), `<div class="sndrow">${sel("adhanSound", SOUNDS.map(x => [x[0], sndLabel(x)]), S.adhanSound)}<button class="playb" data-act="playAdhan" data-k="adhanSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("sunrise", ar() ? "أذان الفجر" : L("Fajr adhan"), `<div class="sndrow">${sel("fajrSound", [SOUNDS[0], ...FAJR_SOUNDS, ...SOUNDS.slice(1)].map(x => [x[0], sndLabel(x)]), S.fajrSound)}<button class="playb" data-act="playAdhan" data-k="fajrSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("remind", L("Remind me before"), sel("remind", remind, S.remind))
-    + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert)))}
-  <div class="sfoot">${ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it.")}</div>
-  ${sgroup("Azkhar", irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning))
+    + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert))
+    + irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning))
     + irow("sunset", ar() ? "تذكير أذكار المساء" : L("Evening azkar reminder"), tog("azEvening", S.azEvening))
     + irow("dua", ar() ? "تذكير أذكار بعد الصلاة" : L("After-prayer azkar reminder"), tog("azPrayer", S.azPrayer))
     + (NativeWidget ? irow("speaker", ar() ? "العدّ بأزرار الصوت" : L("Count with volume buttons"), tog("volKeys", S.volKeys)) : ""))}
+  <div class="sfoot">${ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it.")}</div>
   <div class="sfoot">${ar() ? "الصباح: بعد الفجر بـ١٥ دقيقة ثم كل ساعتين حتى الظهر. المساء: بعد العصر بـ١٥ دقيقة ثم كل ساعتين حتى العشاء. بعد الصلاة: بعد كل صلاة بـ١٥ دقيقة. يتوقف التذكير عند إكمال الأذكار." : L("Morning: 15 min after Fajr, then every 2 hours until Dhuhr. Evening: 15 min after Asr, then every 2 hours until Isha. After prayer: 15 min after each prayer. Reminders stop once you finish.")}</div>
   ${sgroup("units", irow("temp", L("Temperature"), sel("temp", [["c", L("Celsius (°C)")], ["f", L("Fahrenheit (°F)")]], S.temp)))}
   <div class="card sbox" style="margin-top:22px">${irow("info", L("About"), `<span class="muted">Rihal 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}</span>`)}<a class="srow irow" href="${PRIVACY_URL}" target="_blank" rel="noopener"><span class="sic"></span><div class="sl">${PRIVACY_LABEL[S.lang] || "Privacy policy"}</div><span aria-hidden="true">↗</span></a></div>

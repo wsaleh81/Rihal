@@ -826,6 +826,23 @@ function render() {
   syncVolKeys();
   pushWidget();
 }
+/* ----- Back (Android button or swipe): previous page inside the app; never on the Mushaf, where swipes turn pages ----- */
+let tabHist = [], lastBack = 0;
+function goBack() {
+  if (tasbihId) { closeTasbih(); return; }
+  if (pickerOpen || dirTarget) { pickerOpen = null; dirTarget = null; renderSheet(); return; }
+  if (S.tab === 3) return;
+  if (setSub) { setSub = null; render(); return; }
+  if (azkarCat != null) { ACT.back(); return; }
+  if (tabHist.length) { S.tab = tabHist.pop(); setSub = null; save(); render(); $("#view").scrollTop = 0; return; }
+  if (S.tab !== 0) { S.tab = 0; save(); render(); return; }
+  if (Date.now() - lastBack < 2000) { try { NativeWidget.exitApp(); } catch (e) {} return; }
+  lastBack = Date.now(); toast(ar() ? "اسحب مرة أخرى للخروج" : L("Swipe back again to exit"));
+}
+function toast(t) {
+  let el = $("#toast"); if (!el) { el = document.createElement("div"); el.id = "toast"; document.body.appendChild(el); }
+  el.textContent = t; el.classList.add("on"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("on"), 1800);
+}
 function vibr(p = 12) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
 
 /* ----- azkar counting: finish and move on, big counter, undo, long-press reset, volume keys ----- */
@@ -907,7 +924,7 @@ function syncVolKeys() {
   try { NativeWidget.setVolumeKeys({ on }); } catch (e) {}
 }
 const ACT = {
-  tab(el) { setSub = null; S.tab = +el.dataset.i; azkarCat = null; save(); render(); $("#view").scrollTop = 0; },
+  tab(el) { const t = +el.dataset.i; if (t !== S.tab) { tabHist.push(S.tab); if (tabHist.length > 20) tabHist.shift(); } setSub = null; S.tab = t; azkarCat = null; save(); render(); $("#view").scrollTop = 0; },
   picker() { pickerOpen = "p"; pickerQuery = ""; pickerRemote = []; renderSheet(); },
   mpicker() { pickerOpen = "p"; pickerQuery = ""; pickerRemote = []; renderSheet(); },
   closeSheet() { pickerOpen = null; dirTarget = null; renderSheet(); },
@@ -997,6 +1014,7 @@ function boot() {
     NativeWidget.addListener("openTab", o => go(o.tab));
     NativeWidget.getLaunchTab().then(o => go(o.tab)).catch(() => {});
     NativeWidget.addListener("volumeKey", () => volCount());
+    NativeWidget.addListener("backButton", () => goBack());
   }
   if (nativeOK()) {
     // a tap on an azkar reminder opens that azkar list

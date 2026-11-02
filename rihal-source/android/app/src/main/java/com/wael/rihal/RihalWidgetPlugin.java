@@ -28,6 +28,20 @@ public class RihalWidgetPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Back gesture: hand it to the page if it is listening. Returns false when nobody listens. */
+    boolean backPressed() {
+        if (!hasListeners("backButton")) return false;
+        notifyListeners("backButton", new JSObject());
+        return true;
+    }
+
+    /** The page has nothing left to go back to: leave the app (it stays in recent apps). */
+    @PluginMethod
+    public void exitApp(PluginCall call) {
+        call.resolve();
+        if (getActivity() != null) getActivity().runOnUiThread(() -> getActivity().moveTaskToBack(true));
+    }
+
     /** Called by MainActivity when a volume key is pressed while counting azkar. */
     void volumePressed() {
         notifyListeners("volumeKey", new JSObject());

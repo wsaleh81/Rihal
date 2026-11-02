@@ -7,6 +7,7 @@ import android.view.KeyEvent;
 import android.webkit.WebView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -24,6 +25,14 @@ public class MainActivity extends BridgeActivity {
         // so the page's safe-area padding is not added on top of the system's own space (gap under the tab bar).
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
+        // Back (button or swipe) goes to the previous page inside the app instead of closing it; the page decides.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (RihalWidgetPlugin.instance != null && RihalWidgetPlugin.instance.backPressed()) return;
+                moveTaskToBack(true);
+            }
+        });
     }
 
     @Override

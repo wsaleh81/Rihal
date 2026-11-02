@@ -21,10 +21,12 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CompassPlugin.class);
         registerPlugin(RihalWidgetPlugin.class);
+        super.onCreate(savedInstanceState);
         // Draw behind the status and navigation bars on every Android version (as Android 15+ already does),
         // so the page's safe-area padding is not added on top of the system's own space (gap under the tab bar).
+        // Must run after super.onCreate: Capacitor switches from the splash theme to the no-title-bar theme there;
+        // enabling it earlier created the window with the splash theme (a "Rihal" title bar with the splash picture).
         EdgeToEdge.enable(this);
-        super.onCreate(savedInstanceState);
         // Back (button or swipe) goes to the previous page inside the app instead of closing it; the page decides.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override

@@ -24,7 +24,7 @@ const PALETTES = [
 /* ---------- settings store ---------- */
 const DEF = {
   lang: "ar", palette: "ocean", appearance: "auto", textSize: "1", bold: false, azkarSize: "1",
-  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: true, azEvening: true, azPrayer: false, volKeys: true, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
+  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: true, azEvening: true, azPrayer: false, azFriday: true, volKeys: true, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
   temp: "c", tab: 0, welcomed: false, compass: "classic", alarm: {}, fontID: "system", v: 2,
   place: { name: "Kuwait City", country: "Kuwait", lat: 29.3759, lon: 47.9774, tz: "Asia/Kuwait", iso: "KW" },
   gps: false,
@@ -267,7 +267,7 @@ async function scheduleAlerts() {
   try {
     const pending = await LocalNotifications.getPending();
     if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications });
-    const azOn = S.azMorning || S.azEvening || S.azPrayer;
+    const azOn = S.azMorning || S.azEvening || S.azPrayer || S.azFriday;
     if (!S.notif && !azOn) return;
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display !== "granted") { alertsDenied = true; return; }
@@ -313,7 +313,17 @@ function azkarReminders(now) {
     if (S.azPrayer && e.prayer !== "sunrise" && e.date + 15 * M > now && !(azStamp.afterPrayer === e.date && catDone("afterPrayer")))
       out.push({ at: e.date + 15 * M, cat: 2, title: AZN[2], body: `${pName(e.prayer)} · ${body}` });
   }
-  return out.slice(0, 150);
+  // Friday: Surat al-Kahf two and a half hours before Dhuhr (Jumu'ah), and the hour of answered dua one hour before Maghrib.
+  if (S.azFriday) {
+    const isFri = t => new Intl.DateTimeFormat("en-US", { timeZone: p.tz, weekday: "short" }).format(new Date(t)) === "Fri";
+    for (const e of ev) {
+      if (e.prayer === "dhuhr" && isFri(e.date) && e.date - 150 * M > now)
+        out.push({ at: e.date - 150 * M, cat: "m:0", title: ar() ? "يوم الجمعة: سورة الكهف" : L("Friday: Surat al-Kahf"), body: ar() ? "اقرأ سورة الكهف وأكثر من الصلاة على النبي ﷺ" : L("Read Surat al-Kahf and send many prayers on the Prophet ﷺ") });
+      if (e.prayer === "maghrib" && isFri(e.date) && e.date - 60 * M > now)
+        out.push({ at: e.date - 60 * M, cat: "m:0", title: ar() ? "ساعة الإجابة يوم الجمعة" : L("Friday: the hour of answered dua"), body: ar() ? "آخر ساعة قبل المغرب، أكثر من الدعاء" : L("The last hour before Maghrib. Make plenty of dua.") });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, 150);
 }
 async function setAlerts(on) {
   if (on && nativeOK()) {
@@ -664,6 +674,7 @@ function azkarList(head, headAr, items) {
       <div class="dshort"><span class="dchk">✓</span><span>${esc(shortAr(d.ar))}</span><b>${d.n > 1 ? "×" + d.n : ""}</b></div>
       <div class="darb">${esc(d.ar)}</div>
       ${d.note ? `<div class="dnote">${esc(d.note)}</div>` : ""}
+      ${d.kahf ? `<button class="kahfb" data-act="openKahf">📖 ${ar() ? "اقرأ سورة الكهف" : esc(L("Read Surat al-Kahf"))}</button>` : ""}
       ${transOf(d) ? `<hr><div class="dtr">${esc(transOf(d))}</div>` : ""}
       <div class="dref">${esc(d.ref)}</div>
       <div class="dfoot"><button class="dminus ${n ? "" : "hide"}" data-act="dec" data-id="${d.id}" aria-label="-1">−1</button><div class="dbar"><i style="width:${Math.min(100, n / d.n * 100)}%"></i></div><div class="dcnt" id="c-${d.id}">${fin ? done : `${n} / ${d.n}`}</div></div></div>`;
@@ -756,9 +767,10 @@ function viewSettings() {
     + irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning))
     + irow("sunset", ar() ? "تذكير أذكار المساء" : L("Evening azkar reminder"), tog("azEvening", S.azEvening))
     + irow("dua", ar() ? "تذكير أذكار بعد الصلاة" : L("After-prayer azkar reminder"), tog("azPrayer", S.azPrayer))
+    + irow("book", ar() ? "تذكير يوم الجمعة" : L("Friday reminder (al-Kahf and the hour of dua)"), tog("azFriday", S.azFriday))
     + (NativeWidget ? irow("speaker", ar() ? "العدّ بأزرار الصوت" : L("Count with volume buttons"), tog("volKeys", S.volKeys)) : ""))}
   <div class="sfoot">${ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it.")}</div>
-  <div class="sfoot">${ar() ? "الصباح: بعد الفجر بـ١٥ دقيقة ثم كل ساعتين حتى الظهر. المساء: بعد العصر بـ١٥ دقيقة ثم كل ساعتين حتى العشاء. بعد الصلاة: بعد كل صلاة بـ١٥ دقيقة. يتوقف التذكير عند إكمال الأذكار." : L("Morning: 15 min after Fajr, then every 2 hours until Dhuhr. Evening: 15 min after Asr, then every 2 hours until Isha. After prayer: 15 min after each prayer. Reminders stop once you finish.")}</div>
+  <div class="sfoot">${ar() ? "الصباح: بعد الفجر بـ١٥ دقيقة ثم كل ساعتين حتى الظهر. المساء: بعد العصر بـ١٥ دقيقة ثم كل ساعتين حتى العشاء. بعد الصلاة: بعد كل صلاة بـ١٥ دقيقة. يتوقف التذكير عند إكمال الأذكار. الجمعة: سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Morning: 15 min after Fajr, then every 2 hours until Dhuhr. Evening: 15 min after Asr, then every 2 hours until Isha. After prayer: 15 min after each prayer. Reminders stop once you finish.")}</div>
   ${sgroup("units", irow("temp", L("Temperature"), sel("temp", [["c", L("Celsius (°C)")], ["f", L("Fahrenheit (°F)")]], S.temp)))}
   <div class="card sbox" style="margin-top:22px">${irow("info", L("About"), `<span class="muted">Rihal 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}</span>`)}<a class="srow irow" href="${PRIVACY_URL}" target="_blank" rel="noopener"><span class="sic"></span><div class="sl">${PRIVACY_LABEL[S.lang] || "Privacy policy"}</div><span aria-hidden="true">↗</span></a></div>
   <div class="sfoot center">${esc(L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities."))}</div>`;
@@ -920,6 +932,7 @@ const ACT = {
     addCount(id, 1);
   },
   dec(el) { addCount(el.dataset.id, -1); },
+  openKahf() { S.tab = 3; save(); mushafSetPage(293); render(); },
   resetAll(el) {
     if (!el.classList.contains("sure")) { el.classList.add("sure"); el.textContent = azT("resetAll"); clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove("sure"); el.textContent = "↺"; }, 3000); return; }
     (listItems() || []).forEach(d => delete azkarCounts[d.id]); saveCounts(); vibr(30); render(); scheduleAlerts();
@@ -946,7 +959,7 @@ document.addEventListener("change", e => {
   const k = el.dataset.k; let v = el.type === "checkbox" ? el.checked : el.value;
   if (k === "remind") v = +v;
   if (k === "notif") { setAlerts(v); return; }
-  if (["azMorning", "azEvening", "azPrayer"].includes(k)) { S[k] = v; save(); if (v) azkarPermission(); else scheduleAlerts(); render(); return; }
+  if (["azMorning", "azEvening", "azPrayer", "azFriday"].includes(k)) { S[k] = v; save(); if (v) azkarPermission(); else scheduleAlerts(); render(); return; }
   S[k] = v; save();
   if (["lang", "method", "hanafi", "remind", "sunriseAlert", "adhanSound", "fajrSound"].includes(k)) scheduleAlerts();
   if (k === "lang") { mosqueState.key = ""; weather = weather; }
@@ -989,7 +1002,7 @@ function boot() {
     // a tap on an azkar reminder opens that azkar list
     LocalNotifications.addListener("localNotificationActionPerformed", a => {
       const c = a && a.notification && a.notification.extra && a.notification.extra.azcat;
-      if (c == null) return; setSub = null; S.tab = 2; azkarCat = +c; save(); render(); $("#view").scrollTop = 0;
+      if (c == null) return; setSub = null; S.tab = 2; azkarCat = typeof c === "string" && c.startsWith("m:") ? c : +c; save(); render(); $("#view").scrollTop = 0;
     });
   }
   if ("serviceWorker" in navigator && !nativeOK() && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});

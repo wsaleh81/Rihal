@@ -282,3 +282,4 @@ body.inmush #app{max-width:none}
 .tznote{margin-top:8px;padding:10px 12px;border-radius:14px;background:#FFF4D6;color:#7A5200;font-size:.85rem;font-weight:700;line-height:1.5}
 [data-theme=dark] .tznote,.dark .tznote{background:#3A2F12;color:#FFD98A}
 .sndrow{display:flex;align-items:center;gap:8px;max-width:62%}.sndrow select{max-width:none;min-width:0;flex:1}
+.kahfb{display:block;width:100%;margin:10px 0 2px;padding:10px;border-radius:14px;background:var(--accent);color:var(--on);font-weight:800;font-size:.95rem;border:0}

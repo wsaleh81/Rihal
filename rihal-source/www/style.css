@@ -303,3 +303,11 @@ body.inmush #app{max-width:none}
 .sndrow{max-width:58%}
 .irow select{padding:6px 6px;border-radius:10px;font-size:.88rem;max-width:40%}
 .sndrow{max-width:54%}.sndrow select{max-width:none}
+.hrg{width:88px;height:88px}
+.hrt{padding:0;gap:0}
+.hrt .r1{font-size:calc(.62rem * var(--rk,1))}.hrt .r1 i{width:calc(12px * var(--rk,1));height:calc(12px * var(--rk,1))}
+.hrt .r2t{font-size:calc(.9rem * var(--rk,1));line-height:1.15}.hrt .r3{font-size:calc(.6rem * var(--rk,1))}
+.hrt .r1,.hrt .r3{line-height:1.2}
+.hrg{width:calc(88px * min(var(--ts), 1.2));height:calc(88px * min(var(--ts), 1.2))}
+.hrt .r1{font-size:calc(.7rem * var(--rk,1))}.hrt .r2t{font-size:calc(1.08rem * var(--rk,1))}.hrt .r3{font-size:calc(.68rem * var(--rk,1))}
+.hrt .r1 i{width:calc(13px * var(--rk,1));height:calc(13px * var(--rk,1))}

@@ -547,6 +547,7 @@ function tickHome() {
     ${weatherBlock()}
     <div class="hrg"><svg viewBox="0 0 104 104"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--deep)"/></linearGradient></defs><circle cx="52" cy="52" r="46.5" fill="none" stroke="var(--tile)" stroke-width="7"/><circle cx="52" cy="52" r="46.5" fill="none" stroke="url(#rg)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C * frac} ${C}" transform="rotate(-90 52 52)"/></svg>
       <div class="hrt"><div class="r1"><i>${next ? PI[next.prayer] : ""}</i>${next ? (ar() ? `${pName(next.prayer)} بعد` : F("{0} in", pName(next.prayer))) : "—"}</div><div class="r2t">${next ? cd(next.date - now) : "--:--:--"}</div><div class="r3">${next ? (ar() ? "عند " + clock(next.date, p.tz) : F("at {0}", clock(next.date, p.tz))) : L("Not available here")}</div></div></div>`;
+  fitRing();
   for (const k of PRAYERS) {
     const el = $("#r-" + k); if (!el) continue;
     const t = r.today[k];
@@ -858,6 +859,26 @@ function fitSettings() {
     const t = s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : "";
     fit(s, () => { c.font = getComputedStyle(s).font; return c.measureText(t).width + 26 > s.clientWidth; }, 0.88, 0.7);
   });
+}
+try { document.fonts.addEventListener("loadingdone", () => fitRing()); } catch (e) {}
+// Keep the countdown text inside the circle whatever the font and text size: each line must fit the circle's width
+// at its height; shrink the text step by step until it does.
+function fitRing() {
+  const box = $(".hrg"), t = box && $(".hrt", box); if (!t) return;
+  const R = box.clientWidth / 2 * 0.80;              // inside of the ring, with a small margin
+  let k = 1; t.style.setProperty("--rk", k);
+  const bad = () => {
+    const c = box.getBoundingClientRect(), cy = c.top + c.height / 2;
+    const kids = [...t.children], h = kids.reduce((v, e) => v + e.getBoundingClientRect().height, 0);
+    if (h > R * 2) return true;
+    for (const ln of t.children) {
+      const b = ln.getBoundingClientRect(), dy = Math.max(Math.abs(b.top - cy), Math.abs(b.bottom - cy));
+      if (dy >= R) return true;
+      if (ln.scrollWidth > 2 * Math.sqrt(R * R - dy * dy)) return true;
+    }
+    return false;
+  };
+  while (bad() && k > 0.5) { k -= 0.04; t.style.setProperty("--rk", k); }
 }
 function vibr(p = 12) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
 

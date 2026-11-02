@@ -6,6 +6,10 @@ on:
   push:
     branches: [main, play-release]
   workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Version code to use instead of the run number (leave empty for the run number)"
+        required: false
 permissions:
   contents: write
 jobs:
@@ -15,7 +19,7 @@ jobs:
       run:
         working-directory: rihal-source
     env:
-      VERSION_CODE: ${{ github.run_number }}
+      VERSION_CODE: ${{ inputs.version_code || github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

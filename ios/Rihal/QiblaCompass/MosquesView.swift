@@ -118,13 +118,28 @@ final class MosqueService: ObservableObject {
         // 2) OpenStreetMap (also lists small neighbourhood mosques that Apple Maps misses)
         jobs += 1; group.enter()
         let ql = "[out:json][timeout:8];(node[\"amenity\"=\"place_of_worship\"][\"religion\"=\"muslim\"](around:3000,\(String(format: "%.2f", lat)),\(String(format: "%.2f", lon)));way[\"amenity\"=\"place_of_worship\"][\"religion\"=\"muslim\"](around:3000,\(String(format: "%.2f", lat)),\(String(format: "%.2f", lon))););out center tags 40;"
-        var comps = URLComponents(string: "https://overpass-api.de/api/interpreter")!
-        comps.queryItems = [URLQueryItem(name: "data", value: ql)]
-        var req = URLRequest(url: comps.url!); req.timeoutInterval = 9
-        URLSession.shared.dataTask(with: req) { data, _, err in
-            if err != nil { lock.lock(); errors += 1; lock.unlock() }
-            if let data, let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let els = j["elements"] as? [[String: Any]] {
+        // The main Overpass server often times out: ask five mirrors at once and use the first good answer (as on Android).
+        let hosts = ["https://overpass-api.de", "https://lz4.overpass-api.de", "https://z.overpass-api.de",
+                     "https://overpass.private.coffee", "https://maps.mail.ru/osm/tools/overpass"]
+        var answered = false, failures = 0
+        for h in hosts {
+            var comps = URLComponents(string: h + "/api/interpreter")!
+            comps.queryItems = [URLQueryItem(name: "data", value: ql)]
+            var req = URLRequest(url: comps.url!); req.timeoutInterval = 9
+            URLSession.shared.dataTask(with: req) { data, _, _ in
+                let els = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["elements"] as? [[String: Any]]
+                lock.lock()
+                if answered { lock.unlock(); return }            // another mirror already answered
+                guard let els else {
+                    failures += 1
+                    let last = failures == hosts.count
+                    if last { errors += 1; answered = true }
+                    lock.unlock()
+                    if last { publish(); group.leave() }
+                    return
+                }
+                answered = true
+                lock.unlock()
                 for e in els {
                     let c = e["center"] as? [String: Any]
                     guard let la = (e["lat"] as? Double) ?? (c?["lat"] as? Double),
@@ -136,10 +151,10 @@ final class MosqueService: ObservableObject {
                     let d = center.distance(from: CLLocation(latitude: la, longitude: lo))
                     add(Mosque(id: String(format: "%.5f,%.5f", la, lo), name: name, address: addr, lat: la, lon: lo, meters: d, item: nil, sources: ["OSM"]))
                 }
-            }
-            publish()
-            group.leave()
-        }.resume()
+                publish()
+                group.leave()
+            }.resume()
+        }
 
         group.notify(queue: .main) { [weak self] in
             guard let self, self.token == mine else { return }

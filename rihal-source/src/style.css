@@ -311,3 +311,4 @@ body.inmush #app{max-width:none}
 .hrg{width:calc(88px * min(var(--ts), 1.2));height:calc(88px * min(var(--ts), 1.2))}
 .hrt .r1{font-size:calc(.7rem * var(--rk,1))}.hrt .r2t{font-size:calc(1.08rem * var(--rk,1))}.hrt .r3{font-size:calc(.68rem * var(--rk,1))}
 .hrt .r1 i{width:calc(13px * var(--rk,1));height:calc(13px * var(--rk,1))}
+.okb{color:var(--zg);font-weight:800;font-size:.9rem;white-space:nowrap}.fixb{border:0;background:var(--accent);color:var(--on);font-weight:800;border-radius:12px;padding:7px 14px;font-size:.88rem}

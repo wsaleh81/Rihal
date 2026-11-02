@@ -333,7 +333,13 @@ async function setAlerts(on) {
   } else if (on && typeof Notification !== "undefined") { try { await Notification.requestPermission(); } catch (e) {} }
   alertsDenied = false; S.notif = on; save(); await scheduleAlerts(); render();
 }
-let alertsDenied = false, exactOK = true;
+let alertsDenied = false, exactOK = true, battOK = true;
+// Battery optimization (Samsung "sleeping apps" and the like) holds alerts back for hours; check and ask Android to exempt Rihal.
+async function checkBattery() {
+  if (!NativeWidget) return;
+  try { const r = await NativeWidget.batteryStatus(); battOK = !!r.ignoring; exactOK = !!r.exact; } catch (e) {}
+}
+async function askBattery() { if (!NativeWidget) return; try { await NativeWidget.requestBattery(); } catch (e) {} }
 // First start (and every start while alerts are on): ask for notification permission, like the iPhone app does.
 async function ensureAlertPermission() {
   if (!nativeOK() || !S.notif) return;
@@ -342,6 +348,9 @@ async function ensureAlertPermission() {
     if (r.display === "prompt" || r.display === "prompt-with-rationale") r = await LocalNotifications.requestPermissions();
     alertsDenied = r.display !== "granted";
   } catch (e) {}
+  await checkBattery();
+  // Ask once by itself (the system shows Allow / Deny); after that the Settings row offers it.
+  if (!battOK && !S.battAsked && !alertsDenied) { S.battAsked = true; save(); await askBattery(); }
   await scheduleAlerts(); if (S.tab === 4) render();
 }
 async function azkarPermission() {
@@ -703,6 +712,7 @@ const SIC = {
   fn: SI('<path d="M15 4h-1.5A2.5 2.5 0 0 0 11 6.5v11A2.5 2.5 0 0 1 8.5 20H7M8 11h7"/>'),
   pm: SI('<circle cx="12" cy="12" r="9"/><path d="M12 6.5v6M9 9.5h6M9 16h6"/>'), sun: PI.dhuhr, bell: I.bell,
   speaker: SI('<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>'),
+  batt: SI('<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 10.5v3M8 12.5l2-3v2h2l-2 3v-2H8z"/>'),
   remind: PI.alarm, sunrise: PI.sunrise, sunset: SI('<path d="M19.5 14.5A7.5 7.5 0 1 1 9.5 4.5a6 6 0 0 0 10 10z"/>'),
   dua: SI('<circle cx="12" cy="4.5" r="1.8"/><circle cx="17" cy="7" r="1.8"/><circle cx="18.2" cy="12.5" r="1.8"/><circle cx="7" cy="7" r="1.8"/><circle cx="5.8" cy="12.5" r="1.8"/><circle cx="12" cy="16" r="1.8"/><path d="M12 17.8V21"/>'), temp: SI('<path d="M10 14.2V5a2 2 0 0 1 4 0v9.2a4 4 0 1 1-4 0z"/><path d="M12 11v5"/>'),
   info: SI('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.6v.2"/>'),
@@ -765,7 +775,8 @@ function viewSettings() {
     + irow("eye", L("Show current prayer (Now)"), tog("showNow", S.showNow !== false)))}
   ${sgroup("Notifications & reminders", hint(irow("bell", L("Adhan alerts"), tog("notif", S.notif)), ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it."))
     + (S.notif && alertsDenied ? `<div class="snote">${ar() ? "التنبيهات مغلقة لهذا التطبيق في إعدادات الجهاز. فعّلها من إعدادات الهاتف ← التطبيقات ← رحّال ← الإشعارات." : esc(F("Notifications are off for this app in device settings. ")) + esc(L("Turn them on in phone Settings → Apps → Rihal → Notifications."))}</div>` : "")
-    + (S.notif && !alertsDenied && !exactOK ? `<div class="snote">${ar() ? "قد تتأخر التنبيهات بضع دقائق. للتنبيه في الدقيقة نفسها اسمح بـ «المنبّهات والتذكيرات»." : esc(L("Alerts may arrive a few minutes late. For the exact minute, allow Alarms & reminders."))} <button class="linkb" data-act="askExact">${ar() ? "السماح" : L("Allow")}</button></div>` : "")
+    + (NativeWidget ? hint(irow("batt", ar() ? "التنبيهات في وقتها" : L("Alerts on time"), battOK && exactOK ? `<span class="okb">✓ ${ar() ? "مفعّل" : L("On")}</span>` : `<button class="fixb" data-act="fixAlerts">${ar() ? "السماح" : L("Allow")}</button>`),
+        ar() ? "يمنع الهاتف من تأخير الأذان والتذكيرات لتوفير البطارية، فتصل في الدقيقة نفسها." : L("Stops the phone from holding back the adhan and reminders to save battery, so they arrive on the minute.")) : "")
     + irow("speaker", ar() ? "الأذان" : L("Adhan"), `<div class="sndrow">${sel("adhanSound", SOUNDS.map(x => [x[0], sndLabel(x)]), S.adhanSound)}<button class="playb" data-act="playAdhan" data-k="adhanSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("sunrise", ar() ? "أذان الفجر" : L("Fajr adhan"), `<div class="sndrow">${sel("fajrSound", [SOUNDS[0], ...FAJR_SOUNDS, ...SOUNDS.slice(1)].map(x => [x[0], sndLabel(x)]), S.fajrSound)}<button class="playb" data-act="playAdhan" data-k="fajrSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("remind", L("Remind me before"), sel("remind", remind, S.remind))
@@ -1028,6 +1039,7 @@ const ACT = {
   resetOff() { S.off = {}; save(); scheduleAlerts(); render(); },
   playAdhan(el) { playAdhan(S[el.dataset.k]); },
   askExact() { askExact(); },
+  async fixAlerts() { if (!battOK) await askBattery(); else await askExact(); },
   adj(el) { const k = el.dataset.k; S.off = { ...offs(), [k]: Math.max(-60, Math.min(60, (offs()[k] || 0) + +el.dataset.d)) }; save(); scheduleAlerts(); render(); },
 };
 document.addEventListener("click", e => { const el = e.target.closest("[data-act]"); if (el && ACT[el.dataset.act]) { if (el.tagName === "A") return; ACT[el.dataset.act](el); } });
@@ -1066,7 +1078,7 @@ function boot() {
   render(); loadWeather();
   setInterval(() => { if (S.tab === 0 && !document.hidden) tickHome(); }, 1000);
   setInterval(() => { if (S.tab === 0 && !document.hidden) { const p = S.place; $("#sunlayer") && ($("#sunlayer").innerHTML = sunLayerSVG(sunInfo(p.lat, p.lon, new Date()))); } }, 60000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleAlerts(); render(); } });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { checkBattery().then(() => { scheduleAlerts(); render(); }); } });
   if (!S.welcomed) welcome(); else { setTimeout(ensureAlertPermission, 1500); if (S.gps) useGPS(true); else if (NativeWidget) loadMosques(); }
   if (NativeWidget) {
     // a tap on the widget opens Prayer Times (0) or Mosques (1)

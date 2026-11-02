@@ -1,6 +1,12 @@
 package com.wael.rihal;
 
+import android.app.AlarmManager;
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -25,6 +31,38 @@ public class RihalWidgetPlugin extends Plugin {
     @PluginMethod
     public void setVolumeKeys(PluginCall call) {
         volumeKeys = Boolean.TRUE.equals(call.getBoolean("on", false));
+        call.resolve();
+    }
+
+    /** Is the app free from battery optimization, and may it set exact alarms? (Alerts on time.) */
+    @PluginMethod
+    public void batteryStatus(PluginCall call) {
+        Context c = getContext();
+        PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
+        boolean ignoring = Build.VERSION.SDK_INT < 23 || (pm != null && pm.isIgnoringBatteryOptimizations(c.getPackageName()));
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        boolean exact = Build.VERSION.SDK_INT < 31 || (am != null && am.canScheduleExactAlarms());
+        JSObject r = new JSObject();
+        r.put("ignoring", ignoring);
+        r.put("exact", exact);
+        call.resolve(r);
+    }
+
+    /** Ask Android (system Allow / Deny dialog) to stop putting Rihal's alerts to sleep. */
+    @PluginMethod
+    public void requestBattery(PluginCall call) {
+        Context c = getContext();
+        try {
+            Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + c.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+            } catch (Exception ignored) {}
+        }
         call.resolve();
     }
 

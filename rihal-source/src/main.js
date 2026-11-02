@@ -276,7 +276,7 @@ async function scheduleAlerts() {
     await LocalNotifications.createChannel({ id: "adhan", name: "Prayer alerts", importance: 5, visibility: 1, vibration: true });
     await LocalNotifications.createChannel({ id: "adhan_sound", name: "Adhan", importance: 5, visibility: 1, vibration: true, sound: "adhan.wav" });
     // A channel per chosen sound (Android fixes a channel's sound when it is created).
-    const chan = k => k === "adhan" ? "adhan_sound" : "adhan_" + k;
+    const chan = k => k === "adhan" ? "adhan_sound" : "adhan_" + k + "_v2";   // _v2: Azan 2 and the Fajr adhan were swapped (a channel keeps its first sound)
     for (const k of new Set([S.adhanSound, S.fajrSound])) if (k !== "adhan") await LocalNotifications.createChannel({ id: chan(k), name: "Adhan " + k.replace(/\D/g, ""), importance: 5, visibility: 1, vibration: true, sound: sndFile(k) });
     const p = S.place, now = Date.now();
     const ev = prayerEvents(now, p.lat, p.lon, p.tz, method(), S.hanafi, offs(), 10).all

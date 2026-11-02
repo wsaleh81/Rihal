@@ -287,3 +287,17 @@ body.inmush #app{max-width:none}
 .shint{display:none;margin:-4px 4px 10px;padding:10px 12px;border-radius:12px;background:var(--tile);color:var(--muted);font-size:.85rem;line-height:1.55}.shint.on{display:block}
 .shint+.srow,.shint+.lbtn{border-top:1px solid var(--line)}
 #toast{position:fixed;left:50%;bottom:calc(90px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)));transform:translateX(-50%);background:rgba(20,30,45,.92);color:#fff;padding:10px 18px;border-radius:20px;font-weight:700;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80;white-space:nowrap}#toast.on{opacity:1}
+
+#cbox{display:none;position:fixed;inset:0;z-index:90}#cbox.on{display:block}
+#cbox .cbg{position:absolute;inset:0;background:rgba(0,0,0,.4)}
+#cbox .cpanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(86vw,360px);background:var(--card);color:var(--ink);border-radius:22px;padding:20px 18px 14px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+#cbox p{margin:0 0 16px;font-weight:700;line-height:1.6;text-align:center}
+#cbox .cbtns{display:flex;gap:10px}#cbox button{flex:1;border:0;border-radius:14px;padding:12px;font-weight:800;font-size:1rem}
+#cbox .cno{background:var(--tile);color:var(--ink)}#cbox .cyes{background:#d9534f;color:#fff}
+.acat{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+/* settings: every title and choice on one line */
+.irow .sl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.95rem}
+.irow select{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44%}
+.sndrow select{max-width:none}
+.irow select{padding:9px 8px}
+.sndrow{max-width:58%}

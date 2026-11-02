@@ -48,7 +48,7 @@ const method = () => METHODS.find(m => m.id === S.method) || METHODS[0];
 const iso3 = c => DATA.iso3[c] || c;
 const CITIES = DATA.cities.map(c => ({ name: c[0], country: c[1], lat: c[2], lon: c[3], tz: c[4], iso: c[5] }));
 
-const LANGS = [["ar", "العربية · Arabic"], ["en", "English · English"], ["tr", "Türkçe · Turkish"], ["fr", "Français · French"], ["it", "Italiano · Italian"], ["de", "Deutsch · German"], ["nl", "Nederlands · Dutch"], ["es", "Español · Spanish"], ["ur", "اردو · Urdu"], ["ta", "தமிழ் · Tamil"], ["ru", "Русский · Russian"]];
+const LANGS = [["ar", "العربية"], ["en", "English"], ["tr", "Türkçe"], ["fr", "Français"], ["it", "Italiano"], ["de", "Deutsch"], ["nl", "Nederlands"], ["es", "Español"], ["ur", "اردو"], ["ta", "தமிழ்"], ["ru", "Русский"]];
 const PNAME_EN = { fajr: "Fajr", sunrise: "Sunrise", dhuhr: "Dhuhr", asr: "Asr", maghrib: "Maghrib", isha: "Isha" };
 const PNAME_AR = { fajr: "الفجر", sunrise: "الشروق", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" };
 const PNAME_LOCAL = {
@@ -705,6 +705,8 @@ const SIC = {
 };
 const irow = (ic, label, ctl, sub, act) => `<${act ? `button class="srow irow lbtn" ${act}` : 'div class="srow irow"'}><span class="sic">${SIC[ic] || ""}</span><div class="sl">${label}${sub ? `<small>${sub}</small>` : ""}</div>${ctl || ""}</${act ? "button" : "div"}>`;
 const seg = (k, opts, cur) => `<div class="seg">${opts.map(([v, t]) => `<button class="${String(v) === String(cur) ? "on" : ""}" data-act="seg" data-k="${k}" data-v="${v}">${esc(t)}</button>`).join("")}</div>`;
+// A row whose explanation shows only when the row's title is tapped.
+const hint = (row, text) => row.replace('<div class="sl">', '<div class="sl" data-act="hint">') + `<div class="shint">${esc(text)}</div>`;
 const sgroup = (t, body) => `<div class="shead">${L(t)}</div><div class="card sbox">${body}</div>`;
 const gmt = tz => { try { const p = new Intl.DateTimeFormat("en-GB", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(new Date()).find(x => x.type === "timeZoneName"); return p ? p.value.replace("GMT", "GMT") : ""; } catch (e) { return ""; } };
 let setSub = null;
@@ -751,29 +753,26 @@ function viewSettings() {
     + irow("size", L("Text size"), sel("textSize", tsizes, S.textSize)) + irow("book", L("Azkhar text size"), sel("azkarSize", asizes, S.azkarSize)) + irow("bold", L("Bold text"), tog("bold", S.bold)))}
   ${sgroup("prayers", irow("loc", L("Current location"), S.gps ? chk : "", esc(S.gps ? p.name : L("Use my location")), 'data-act="gps"')
     + irow("pin", L("Choose a city"), (S.gps ? "" : chk) + chev, S.gps ? "" : esc(p.name), 'data-act="picker"')
-    + irow("clock", L("Local time"), `<b class="muted tnum">${tf(p.tz).format(new Date())} · ${gmt(p.tz)}</b>`)
-    + `<div class="snote">${ar() ? `الصلاة والقبلة والمساجد والطقس كلها تعتمد على هذا الموقع. المنطقة الزمنية: ${esc(p.tz)}` : esc(F("Prayer times, Qibla, mosques and weather all use this location. Time zone: {0}", p.tz))}</div>`
+    + hint(irow("clock", L("Local time"), `<b class="muted tnum">${tf(p.tz).format(new Date())} · ${gmt(p.tz)}</b>`), ar() ? `الصلاة والقبلة والمساجد والطقس كلها تعتمد على هذا الموقع. المنطقة الزمنية: ${p.tz}` : F("Prayer times, Qibla, mosques and weather all use this location. Time zone: {0}", p.tz))
     + irow("fn", L("Method"), sel("method", METHODS.map(m => [m.id, shortM(L(m.name))]), S.method))
     + irow("pm", L("Adjust times"), `<span class="muted">${L("minutes")}</span>` + chev, "", 'data-act="setOffsets"')
     + irow("sun", L("Hanafi Asr"), tog("hanafi", S.hanafi))
     + irow("eye", L("Show current prayer (Now)"), tog("showNow", S.showNow !== false)))}
-  ${sgroup("Notifications & reminders", irow("bell", L("Adhan alerts"), tog("notif", S.notif))
+  ${sgroup("Notifications & reminders", hint(irow("bell", L("Adhan alerts"), tog("notif", S.notif)), ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it."))
     + (S.notif && alertsDenied ? `<div class="snote">${ar() ? "التنبيهات مغلقة لهذا التطبيق في إعدادات الجهاز. فعّلها من إعدادات الهاتف ← التطبيقات ← رحّال ← الإشعارات." : esc(F("Notifications are off for this app in device settings. ")) + esc(L("Turn them on in phone Settings → Apps → Rihal → Notifications."))}</div>` : "")
     + (S.notif && !alertsDenied && !exactOK ? `<div class="snote">${ar() ? "قد تتأخر التنبيهات بضع دقائق. للتنبيه في الدقيقة نفسها اسمح بـ «المنبّهات والتذكيرات»." : esc(L("Alerts may arrive a few minutes late. For the exact minute, allow Alarms & reminders."))} <button class="linkb" data-act="askExact">${ar() ? "السماح" : L("Allow")}</button></div>` : "")
     + irow("speaker", ar() ? "صوت الأذان" : L("Adhan sound"), `<div class="sndrow">${sel("adhanSound", SOUNDS.map(x => [x[0], sndLabel(x)]), S.adhanSound)}<button class="playb" data-act="playAdhan" data-k="adhanSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("sunrise", ar() ? "أذان الفجر" : L("Fajr adhan"), `<div class="sndrow">${sel("fajrSound", [SOUNDS[0], ...FAJR_SOUNDS, ...SOUNDS.slice(1)].map(x => [x[0], sndLabel(x)]), S.fajrSound)}<button class="playb" data-act="playAdhan" data-k="fajrSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("remind", L("Remind me before"), sel("remind", remind, S.remind))
     + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert))
-    + irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning))
-    + irow("sunset", ar() ? "تذكير أذكار المساء" : L("Evening azkar reminder"), tog("azEvening", S.azEvening))
-    + irow("dua", ar() ? "تذكير أذكار بعد الصلاة" : L("After-prayer azkar reminder"), tog("azPrayer", S.azPrayer))
-    + irow("book", ar() ? "تذكير يوم الجمعة" : L("Friday reminder (al-Kahf and the hour of dua)"), tog("azFriday", S.azFriday))
-    + (NativeWidget ? irow("speaker", ar() ? "العدّ بأزرار الصوت" : L("Count with volume buttons"), tog("volKeys", S.volKeys)) : ""))}
-  <div class="sfoot">${ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it.")}</div>
-  <div class="sfoot">${ar() ? "الصباح: بعد الفجر بـ١٥ دقيقة ثم كل ساعتين حتى الظهر. المساء: بعد العصر بـ١٥ دقيقة ثم كل ساعتين حتى العشاء. بعد الصلاة: بعد كل صلاة بـ١٥ دقيقة. يتوقف التذكير عند إكمال الأذكار. الجمعة: سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Morning: 15 min after Fajr, then every 2 hours until Dhuhr. Evening: 15 min after Asr, then every 2 hours until Isha. After prayer: 15 min after each prayer. Reminders stop once you finish.")}</div>
+    + hint(irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning)), ar() ? "بعد الفجر بـ١٥ دقيقة، ثم كل ساعتين حتى الظهر. يتوقف عند إكمال أذكار الصباح." : L("15 min after Fajr, then every 2 hours until Dhuhr. Stops once you finish the morning azkar."))
+    + hint(irow("sunset", ar() ? "تذكير أذكار المساء" : L("Evening azkar reminder"), tog("azEvening", S.azEvening)), ar() ? "بعد العصر بـ١٥ دقيقة، ثم كل ساعتين حتى العشاء. يتوقف عند إكمال أذكار المساء." : L("15 min after Asr, then every 2 hours until Isha. Stops once you finish the evening azkar."))
+    + hint(irow("dua", ar() ? "تذكير أذكار بعد الصلاة" : L("After-prayer azkar reminder"), tog("azPrayer", S.azPrayer)), ar() ? "بعد كل صلاة بـ١٥ دقيقة، إذا لم تكمل أذكار بعد الصلاة." : L("15 min after each prayer, if you haven't finished the after-prayer azkar."))
+    + hint(irow("book", ar() ? "تذكير يوم الجمعة" : L("Friday reminder"), tog("azFriday", S.azFriday)), ar() ? "سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Surat al-Kahf 2½ hours before Dhuhr, and the hour of dua 1 hour before Maghrib."))
+    + (NativeWidget ? hint(irow("speaker", ar() ? "العدّ بأزرار الصوت" : L("Count with volume buttons"), tog("volKeys", S.volKeys)), ar() ? "عند فتح قائمة الأذكار، زرّا الصوت يعدّان الذكر التالي." : L("While an azkar list is open, the volume buttons count the next dhikr.")) : ""))}
   ${sgroup("units", irow("temp", L("Temperature"), sel("temp", [["c", L("Celsius (°C)")], ["f", L("Fahrenheit (°F)")]], S.temp)))}
-  <div class="card sbox" style="margin-top:22px">${irow("info", L("About"), `<span class="muted">Rihal 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}</span>`)}<a class="srow irow" href="${PRIVACY_URL}" target="_blank" rel="noopener"><span class="sic"></span><div class="sl">${PRIVACY_LABEL[S.lang] || "Privacy policy"}</div><span aria-hidden="true">↗</span></a></div>
-  <div class="sfoot center">${esc(L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities."))}</div>`;
+  <div class="card sbox" style="margin-top:22px">${hint(irow("info", L("About"), `<span class="muted">Rihal 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}</span>`), L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities."))}<a class="srow irow" href="${PRIVACY_URL}" target="_blank" rel="noopener"><span class="sic"></span><div class="sl">${PRIVACY_LABEL[S.lang] || "Privacy policy"}</div><span aria-hidden="true">↗</span></a></div>
+`;
 }
 
 /* ----- place picker sheet ----- */
@@ -932,6 +931,7 @@ const ACT = {
     addCount(id, 1);
   },
   dec(el) { addCount(el.dataset.id, -1); },
+  hint(el) { const h = el.closest(".srow").nextElementSibling; if (h && h.classList.contains("shint")) h.classList.toggle("on"); },
   openKahf() { S.tab = 3; save(); mushafSetPage(293); render(); },
   resetAll(el) {
     if (!el.classList.contains("sure")) { el.classList.add("sure"); el.textContent = azT("resetAll"); clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove("sure"); el.textContent = "↺"; }, 3000); return; }

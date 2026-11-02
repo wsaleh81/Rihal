@@ -24,7 +24,7 @@ const PALETTES = [
 /* ---------- settings store ---------- */
 const DEF = {
   lang: "ar", palette: "ocean", appearance: "auto", textSize: "1", bold: false, azkarSize: "1",
-  method: "kuwait", hanafi: false, showNow: true, azMorning: true, azEvening: true, azPrayer: false, volKeys: true, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
+  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: true, azEvening: true, azPrayer: false, volKeys: true, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
   temp: "c", tab: 0, welcomed: false, compass: "classic", alarm: {}, fontID: "system", v: 2,
   place: { name: "Kuwait City", country: "Kuwait", lat: 29.3759, lon: 47.9774, tz: "Asia/Kuwait", iso: "KW" },
   gps: false,
@@ -287,13 +287,16 @@ async function scheduleAlerts() {
     try { exactOK = (await LocalNotifications.checkExactNotificationSetting()).exact_alarm === "granted"; } catch (e) { exactOK = true; }
     await LocalNotifications.createChannel({ id: "adhan", name: "Prayer alerts", importance: 5, visibility: 1, vibration: true });
     await LocalNotifications.createChannel({ id: "adhan_sound", name: "Adhan", importance: 5, visibility: 1, vibration: true, sound: "adhan.wav" });
+    // A channel per chosen sound (Android fixes a channel's sound when it is created).
+    const chan = k => k === "adhan" ? "adhan_sound" : "adhan_" + k;
+    for (const k of new Set([S.adhanSound, S.fajrSound])) if (k !== "adhan") await LocalNotifications.createChannel({ id: chan(k), name: "Adhan " + k.replace(/\D/g, ""), importance: 5, visibility: 1, vibration: true, sound: sndFile(k) });
     const p = S.place, now = Date.now();
     const ev = prayerEvents(now, p.lat, p.lon, p.tz, method(), S.hanafi, offs(), 10).all
       .filter(e => e.date > now && (e.prayer !== "sunrise" || S.sunriseAlert) && (!S.muted[e.prayer] || alarmOn(e.prayer)));
     const list = []; let id = 1;
     if (S.notif) for (const e of ev.slice(0, 120)) {
       const nm = pName(e.prayer), sound = alarmOn(e.prayer);
-      list.push({ id: id++, title: ar() && e.prayer !== "sunrise" ? "صلاة " + nm : nm, body: p.name, channelId: sound ? "adhan_sound" : "adhan", sound: sound ? "adhan.wav" : undefined, isExactNotification: exactOK, schedule: { at: new Date(e.date), allowWhileIdle: true } });
+      list.push({ id: id++, title: ar() && e.prayer !== "sunrise" ? "صلاة " + nm : nm, body: p.name, channelId: sound ? chan(e.prayer === "fajr" ? S.fajrSound : S.adhanSound) : "adhan", sound: sound ? sndFile(e.prayer === "fajr" ? S.fajrSound : S.adhanSound) : undefined, isExactNotification: exactOK, schedule: { at: new Date(e.date), allowWhileIdle: true } });
       if (S.remind > 0 && e.date - S.remind * 60000 > now)
         list.push({ id: id++, title: ar() ? `${nm} بعد ${S.remind} دقيقة` : F("{0} in {1} minutes", nm, S.remind), body: p.name, channelId: "adhan", isExactNotification: exactOK, schedule: { at: new Date(e.date - S.remind * 60000), allowWhileIdle: true } });
     }
@@ -713,8 +716,23 @@ const sgroup = (t, body) => `<div class="shead">${L(t)}</div><div class="card sb
 const gmt = tz => { try { const p = new Intl.DateTimeFormat("en-GB", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(new Date()).find(x => x.type === "timeZoneName"); return p ? p.value.replace("GMT", "GMT") : ""; } catch (e) { return ""; } };
 let setSub = null;
 let adhanAudio = null;
-function playAdhan() {
-  try { if (adhanAudio && !adhanAudio.paused) { adhanAudio.pause(); adhanAudio = null; return; } adhanAudio = new Audio("adhan.wav"); adhanAudio.play(); } catch (e) {}
+// Adhan sounds (files in res/raw, copied to www for the preview). The Fajr adhan ("as-salatu khayrun min an-nawm") is offered for Fajr only.
+const SOUNDS = [["adhan", "adhan.wav", ""], ...[1, 2, 3].map(i => [`azan${i}`, `azan${i}.ogg`, "s"]), ...[4, 5, 6, 7, 8, 9, 10, 11].map(i => [`azan${i}`, `azan${i}.ogg`, "c"])];
+const FAJR_SOUNDS = [["fajr1", "fajr1.ogg", "s"]];
+const sndFile = k => ([...SOUNDS, ...FAJR_SOUNDS].find(x => x[0] === k) || SOUNDS[0])[1];
+function sndLabel([k, , len]) {
+  const n = k === "adhan" ? 0 : +k.replace(/\D/g, ""), arN = String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+  if (k === "adhan") return ar() ? "الافتراضي" : L("Default");
+  const fj = k.startsWith("fajr");
+  if (ar()) return `${fj ? "أذان الفجر" : "أذان " + arN} – ${len === "s" ? "قصير" : "كامل"}`;
+  return `${fj ? L("Fajr azan") : "Azan " + n} – ${L(len === "s" ? "short" : "complete")}`;
+}
+let playing = null;
+function playAdhan(k) {
+  try {
+    if (adhanAudio) { adhanAudio.pause(); const same = playing === k; adhanAudio = null; playing = null; if (same) return; }
+    adhanAudio = new Audio(sndFile(k)); playing = k; adhanAudio.onended = () => { adhanAudio = null; playing = null; }; adhanAudio.play();
+  } catch (e) {}
 }
 function viewOffsets() {
   const rows = PRAYERS.map(k => { const v = offs()[k] || 0; return `<div class="srow"><div class="sl"><b>${pName(k)}</b></div><span class="offv ${v ? "set" : ""}">${v > 0 ? "+" : ""}${v} ${L("min")}</span><div class="step"><button data-act="adj" data-k="${k}" data-d="-1">−</button><button data-act="adj" data-k="${k}" data-d="1">+</button></div></div>`; }).join("");
@@ -749,7 +767,8 @@ function viewSettings() {
   ${sgroup("notifications", irow("bell", L("Adhan alerts"), tog("notif", S.notif))
     + (S.notif && alertsDenied ? `<div class="snote">${ar() ? "التنبيهات مغلقة لهذا التطبيق في إعدادات الجهاز. فعّلها من إعدادات الهاتف ← التطبيقات ← رحّال ← الإشعارات." : esc(F("Notifications are off for this app in device settings. ")) + esc(L("Turn them on in phone Settings → Apps → Rihal → Notifications."))}</div>` : "")
     + (S.notif && !alertsDenied && !exactOK ? `<div class="snote">${ar() ? "قد تتأخر التنبيهات بضع دقائق. للتنبيه في الدقيقة نفسها اسمح بـ «المنبّهات والتذكيرات»." : esc(L("Alerts may arrive a few minutes late. For the exact minute, allow Alarms & reminders."))} <button class="linkb" data-act="askExact">${ar() ? "السماح" : L("Allow")}</button></div>` : "")
-    + irow("speaker", ar() ? "صوت الأذان" : L("Adhan sound"), `<button class="playb" data-act="playAdhan" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button>`)
+    + irow("speaker", ar() ? "صوت الأذان" : L("Adhan sound"), `<div class="sndrow">${sel("adhanSound", SOUNDS.map(x => [x[0], sndLabel(x)]), S.adhanSound)}<button class="playb" data-act="playAdhan" data-k="adhanSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
+    + irow("sunrise", ar() ? "أذان الفجر" : L("Fajr adhan"), `<div class="sndrow">${sel("fajrSound", [SOUNDS[0], ...FAJR_SOUNDS, ...SOUNDS.slice(1)].map(x => [x[0], sndLabel(x)]), S.fajrSound)}<button class="playb" data-act="playAdhan" data-k="fajrSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("remind", L("Remind me before"), sel("remind", remind, S.remind))
     + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert)))}
   <div class="sfoot">${ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it.")}</div>
@@ -935,7 +954,7 @@ const ACT = {
   setOffsets() { setSub = "offsets"; render(); $("#view").scrollTop = 0; },
   setBack() { setSub = null; render(); },
   resetOff() { S.off = {}; save(); scheduleAlerts(); render(); },
-  playAdhan() { playAdhan(); },
+  playAdhan(el) { playAdhan(S[el.dataset.k]); },
   askExact() { askExact(); },
   adj(el) { const k = el.dataset.k; S.off = { ...offs(), [k]: Math.max(-60, Math.min(60, (offs()[k] || 0) + +el.dataset.d)) }; save(); scheduleAlerts(); render(); },
 };
@@ -947,7 +966,7 @@ document.addEventListener("change", e => {
   if (k === "notif") { setAlerts(v); return; }
   if (["azMorning", "azEvening", "azPrayer"].includes(k)) { S[k] = v; save(); if (v) azkarPermission(); else scheduleAlerts(); render(); return; }
   S[k] = v; save();
-  if (["lang", "method", "hanafi", "remind", "sunriseAlert"].includes(k)) scheduleAlerts();
+  if (["lang", "method", "hanafi", "remind", "sunriseAlert", "adhanSound", "fajrSound"].includes(k)) scheduleAlerts();
   if (k === "lang") { mosqueState.key = ""; weather = weather; }
   render();
 });

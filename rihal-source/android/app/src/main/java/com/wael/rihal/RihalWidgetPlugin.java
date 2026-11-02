@@ -44,9 +44,6 @@ public class RihalWidgetPlugin extends Plugin {
     public void update(PluginCall call) {
         String data = call.getString("data");
         if (data != null) RihalWidgets.save(getContext(), data);
-        // Remember the current time zone, so TimeZoneReceiver can tell when the phone moves to a new one.
-        getContext().getSharedPreferences(RihalWidgets.PREFS, android.content.Context.MODE_PRIVATE).edit()
-            .putString("last_tz", java.util.TimeZone.getDefault().getID()).apply();
         RihalWidgets.updateAll(getContext());
         call.resolve();
     }

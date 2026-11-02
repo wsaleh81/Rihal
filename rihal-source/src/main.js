@@ -143,7 +143,6 @@ function pushWidget() {
     const m = list && list[0];
     const data = {
       lang: S.lang, city: p.name,
-      tzMsg: { t: ar() ? "رحّال" : "Rihal", b: ar() ? "أنت الآن في منطقة زمنية جديدة. افتح رحّال لتحديث مواقيت الصلاة." : L("You are in a new time zone. Open Rihal to update your prayer times.") },
       events: ev.map(e => ({ t: e.date, ar: PNAME_AR[e.prayer], name: ar() ? PNAME_EN[e.prayer] : pName(e.prayer), hm: clock(e.date, p.tz) })),
       mosque: m ? { name: m.name, d: Math.round(m.d) } : null,
     };
@@ -254,23 +253,12 @@ async function useGPS(silent) {
         name = a.city || a.town || a.village || a.suburb || a.county || a.state || name; country = a.country || country; iso = (a.country_code || iso || "--").toUpperCase();
       } catch (e) {}
     } else if (near.d >= 40) { iso = near.c.iso; }
-    // Time zone of the place itself (from the nearest known city in the same country), not the phone's setting:
-    // a phone set by hand to "GMT+3" would otherwise shift every prayer by an hour (e.g. Egypt after summer time ends).
-    const devTz = deviceTz();
-    const tz = near.d < 150 || (near.c.iso === iso && near.d < 600) ? safeTz(near.c.tz) : (devTz || near.c.tz);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || near.c.tz;
     S.place = { name, country, lat, lon, tz, iso, gps: true }; S.gps = true; save(); pushLocation();
     gpsState = "ok"; gpsFixAt = Date.now(); weather = null; loadWeather(); scheduleAlerts(); render(); if (S.tab === 1 || NativeWidget) loadMosques();
   } catch (e) { gpsState = "denied"; render(); }
 }
 let gpsState = "idle", gpsAcc = null;
-const deviceTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return null; } };
-const tzOffset = (tz, ms = Date.now()) => { try { const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longOffset" }).formatToParts(new Date(ms)).find(x => x.type === "timeZoneName").value; const m = p.match(/([+-])(\d\d):?(\d\d)?/); return m ? (m[1] === "-" ? -1 : 1) * (+m[2] * 60 + +(m[3] || 0)) : 0; } catch (e) { return 0; } };
-// The phone's clock is in a different time zone from the place it is standing in (GPS mode only).
-function tzMismatch() {
-  const p = S.place, d = deviceTz();
-  if (!p.gps || !d || d === p.tz) return null;
-  return tzOffset(d) === tzOffset(p.tz) ? null : { phone: gmt(d), place: gmt(p.tz) };
-}
 
 /* ---------- alerts ---------- */
 const nativeOK = () => Capacitor.isNativePlatform();
@@ -427,13 +415,7 @@ function bannerHTML() {
   else if (S.gps) { tint = "var(--zg)"; title = loc; sub = ar() ? "GPS مؤكد · " + agoTxt() : F("GPS confirmed · {0}", agoTxt()); dot = true; trailing = pill(I.refresh, L("Refresh"), "refreshGPS", "deep") + cityPill; }
   else { tint = "var(--muted)"; title = p.name; sub = L("Manual city"); trailing = pill(PI.gps, L("Use GPS"), "refreshGPS", "deep") + cityPill; }
   return `<div class="bnr" style="--t:${tint}"><div class="bico">${spin ? '<i class="spin"></i>' : icon}${dot ? '<i class="bdot"></i>' : ""}</div>
-    <div class="btxt"><b>${esc(title)}</b><small>${esc(sub)}</small></div><div class="bact">${trailing}</div></div>${tzNote()}`;
-}
-function tzNote() {
-  const m = gpsState !== "finding" && tzMismatch(); if (!m) return "";
-  const t = ar() ? `ساعة هاتفك على ${m.phone} لكن ${S.place.name} على ${m.place}. المواقيت معروضة بتوقيت ${S.place.name}. فعّل «المنطقة الزمنية التلقائية» من إعدادات الهاتف ← التاريخ والوقت.`
-    : F("Your phone's clock is set to {0}, but {1} is on {2}. Prayer times are shown in {1} time. Turn on Automatic time zone in phone Settings → Date and time.", m.phone, S.place.name, m.place);
-  return `<div class="tznote">⚠️ ${esc(t)}</div>`;
+    <div class="btxt"><b>${esc(title)}</b><small>${esc(sub)}</small></div><div class="bact">${trailing}</div></div>`;
 }
 function weatherBlock() {
   const w = weather;

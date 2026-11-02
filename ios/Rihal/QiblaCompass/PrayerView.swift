@@ -258,9 +258,10 @@ struct PrayerView: View {
             guard let e = nowEv else { return "—" }
             return e.prayer == .sunrise ? (Loc.ar ? "الصبح" : L("Morning")) : e.prayer.name
         }()
-        let ring = 78 * min(Theme.textScale, 1.4)
+        let ring = 88 * min(Theme.textScale, 1.3)
         return HStack(spacing: 8) {
-            if !model.showNow { Color.clear.frame(maxWidth: .infinity, maxHeight: 1) } else {
+            // "Now" off: the weather takes its place on the side; "Now" on: the weather sits in the middle.
+            if !model.showNow { weatherBlock.frame(maxWidth: .infinity, alignment: .leading) } else {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text(L("NOW")).font(.sys(size: 10, weight: .heavy)).foregroundStyle(Theme.onAccent)
@@ -276,7 +277,7 @@ struct PrayerView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            weatherBlock
+            if model.showNow { weatherBlock }
 
             ZStack {
                 Circle().stroke(Theme.tile, lineWidth: 5)
@@ -287,16 +288,17 @@ struct PrayerView: View {
                 VStack(spacing: 1) {
                     HStack(spacing: 3) {
                         Image(systemName: next?.prayer.symbol ?? "clock").font(.sys(size: 9, weight: .bold)).foregroundStyle(Theme.sunOrange)
-                        Text(Loc.ar ? "\(next?.prayer.name ?? "—") بعد" : Loc.f("{0} in", next?.prayer.name ?? "—")).font(.sys(size: 10, weight: .heavy)).foregroundStyle(Theme.ink).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(Loc.ar ? "\(next?.prayer.name ?? "—") بعد" : Loc.f("{0} in", next?.prayer.name ?? "—")).font(.sys(size: 10, weight: .heavy)).foregroundStyle(Theme.ink).lineLimit(1).minimumScaleFactor(0.5)
                     }
                     Text(next.map { counter($0.date.timeIntervalSince(now)) } ?? "--:--:--")
                         .font(.sys(size: 13.5, weight: .heavy, design: Theme.design)).monospacedDigit()
-                        .minimumScaleFactor(0.6).lineLimit(1).foregroundStyle(Theme.ink)
+                        .minimumScaleFactor(0.5).lineLimit(1).foregroundStyle(Theme.ink)
                         .contentTransition(.numericText(countsDown: true))
                     Text(next.map { Loc.ar ? "عند " + fmt.string(from: $0.date) : Loc.f("at {0}", fmt.string(from: $0.date)) } ?? L("Not available here"))
-                        .font(.sys(size: 9.5, weight: .heavy)).foregroundStyle(Theme.mint).lineLimit(1).minimumScaleFactor(0.7)
+                        .font(.sys(size: 9.5, weight: .heavy)).foregroundStyle(Theme.mint).lineLimit(1).minimumScaleFactor(0.5)
                 }
-                .padding(.horizontal, 7)
+                // keep every line inside the circle: the top and bottom lines are where the circle is narrowest
+                .frame(width: ring * 0.7)
             }
             .frame(width: ring, height: ring)
             .frame(maxWidth: .infinity, alignment: .trailing)

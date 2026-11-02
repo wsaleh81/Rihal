@@ -46,118 +46,30 @@ struct CatIcon: View {
 struct AzkharDetailView: View {
     @AppStorage("langID") private var langID = "ar"
     let cat: AzkharCategory
-    @Binding var counts: [String: Int]
     var onClose: () -> Void
 
-    private var bodyFont: Font { .sys(size: 19 * Theme.azkarScale) }
-
-    private var hint: String {
-        switch langID {
-        case "ar": "اضغط على البطاقة للعدّ. النصوص مضمّنة وتعمل بدون إنترنت."
-        case "tr": "Saymak için karta dokunun. Metinler çevrimdışı çalışır."
-        case "fr": "Touchez une carte pour compter. Les textes fonctionnent hors ligne."
-        case "it": "Tocca una scheda per contare. I testi funzionano offline."
-        case "de": "Karte antippen zum Zählen. Die Texte funktionieren offline."
-        case "nl": "Tik op een kaart om te tellen. De teksten werken offline."
-        case "es": "Toca una tarjeta para contar. Los textos funcionan sin conexión."
-        default: LocX.hint[langID] ?? "Tap a card to count. Texts work offline."
-        }
-    }
-    private var doneText: String {
-        switch langID {
-        case "ar": "تم"; case "tr": "Tamam"; case "fr": "Terminé"; case "it": "Fatto"
-        case "de": "Fertig"; case "nl": "Klaar"; case "es": "Hecho"; default: LocX.done[langID] ?? "Done"
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button(action: onClose) {
-                    Image(systemName: "chevron.left").font(.sys(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.ink).frame(width: 40, height: 40)
-                        .background(Theme.tile, in: Circle())
-                }
-                CatIcon(cat: cat, size: 18).foregroundStyle(Theme.mintDeep)
-                Text(cat.title(langID)).font(.sys(size: 22, weight: .bold, design: Theme.design)).foregroundStyle(Theme.ink)
-                Spacer()
-            }
-            .padding(.horizontal, 20).padding(.vertical, 12)
-
-            ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(AzkharData.items(cat.rawValue)) { d in card(d) }
-                    Text(hint).font(.sys(size: 12)).foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.center).padding(.top, 4)
-                    Text(Loc.ar ? "القرآن: تنزيل · الأذكار: حصن المسلم" : L("Quran: Tanzil · Adhkar: Hisn al-Muslim"))
-                        .font(.sys(size: 11)).foregroundStyle(Theme.muted.opacity(0.8))
-                }
-                .padding(.horizontal, 20).padding(.bottom, 24)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .background(Theme.bg.ignoresSafeArea())
-        .contentShape(Rectangle())
-        .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { v in
-            if v.translation.width > 80 && abs(v.translation.width) > 1.6 * abs(v.translation.height) { onClose() }
-        })
-    }
-
-    private func translation(_ d: Dhikr) -> String? {
-        // Arabic app language: Arabic only. Other languages: their own translation.
-        if langID == "ar" { return nil }
-        return d.translations[langID] ?? LocX.azkar[d.id]?[langID] ?? d.translations["en"]
-    }
-
-    private func card(_ d: Dhikr) -> some View {
-        let n = counts[d.id] ?? 0
-        let done = n >= d.times
-        return Button {
-            if n < d.times { counts[d.id] = n + 1; UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-        } label: {
-            VStack(spacing: 12) {
-                // Arabic: from the right, justified
-                JustifiedText(text: d.arabic, size: 19 * Theme.azkarScale, color: UIColor(Theme.ink), lineSpacing: 9, markColor: UIColor(Theme.mintDeep))
-                if let t = translation(d) {
-                    Divider().overlay(Theme.line)
-                    Text(t)
-                        .font(bodyFont).lineSpacing(4)
-                        .foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Text(d.ref).font(.sys(size: 12, weight: .medium)).foregroundStyle(Theme.mintDeep)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 10) {
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Theme.tile)
-                        GeometryReader { g in Capsule().fill(Theme.mint).frame(width: g.size.width * CGFloat(min(n, d.times)) / CGFloat(d.times)) }
-                    }
-                    .frame(height: 6)
-                    Text(done ? doneText : "\(n) / \(d.times)")
-                        .font(.sys(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(done ? Theme.mintDeep : Theme.ink).monospacedDigit()
-                    if n > 0 {
-                        Button { counts[d.id] = 0 } label: {
-                            Image(systemName: "arrow.counterclockwise").font(.sys(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
-                                .frame(width: 28, height: 28)
-                        }
-                    }
-                }
-            }
-            .padding(16)
-            .background(done ? Theme.rowNow : Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(done ? Theme.mint.opacity(0.5) : Theme.line, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
+        AzkarListView(
+            title: cat.title(langID),
+            rows: AzkharData.items(cat.rawValue).map { d in
+                // Arabic app language: Arabic only. Other languages: their own translation.
+                let t: String? = langID == "ar" ? nil : (d.translations[langID] ?? LocX.azkar[d.id]?[langID] ?? d.translations["en"])
+                return AzkarRow(id: d.id, heading: nil, arabic: d.arabic, translation: t, note: nil, ref: d.ref, times: d.times)
+            },
+            footer: Loc.ar ? "القرآن: تنزيل · الأذكار: حصن المسلم" : L("Quran: Tanzil · Adhkar: Hisn al-Muslim"),
+            icon: { CatIcon(cat: cat, size: 18).foregroundStyle(Theme.mintDeep) },
+            onClose: onClose)
     }
 }
 
 /// All Azkar collections, opened from the Azkar card.
 struct AzkharCollectionsView: View {
+    @EnvironmentObject var model: AppModel
     @AppStorage("langID") private var langID = "ar"
     var onClose: (() -> Void)? = nil
-    @State private var counts: [String: Int] = [:]
+    @ObservedObject private var store = AzkarStore.shared
+    @State private var askReset: (title: String, ids: [String])? = nil
+    @State private var moreStart: Int? = nil
     @State private var flipped: AzkharCategory? = nil
     @State private var opened: AzkharCategory? = nil
     @State private var showMore = false
@@ -204,10 +116,35 @@ struct AzkharCollectionsView: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .fullScreenCover(item: $opened, onDismiss: { withAnimation(.easeInOut(duration: 0.35)) { flipped = nil } }) { c in
-            AzkharDetailView(cat: c, counts: $counts, onClose: { opened = nil })
+            AzkharDetailView(cat: c, onClose: { opened = nil })
         }
-        .fullScreenCover(isPresented: $showMore) {
-            MoreAzkarView(counts: $counts, onClose: { showMore = false })
+        .fullScreenCover(isPresented: $showMore, onDismiss: { moreStart = nil }) {
+            MoreAzkarView(start: moreStart, onClose: { showMore = false })
+        }
+        // Long-press on a category: ask before clearing its counter
+        .alert(askReset.map { AzkarText.resetQuestion($0.title) } ?? "", isPresented: Binding(get: { askReset != nil }, set: { if !$0 { askReset = nil } })) {
+            Button(Loc.ar ? "نعم" : L("Yes"), role: .destructive) {
+                if let r = askReset { store.reset(r.ids); UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+                askReset = nil
+            }
+            Button(Loc.ar ? "لا" : L("No"), role: .cancel) { askReset = nil }
+        }
+        .onAppear {
+            store.sync(place: model.place, method: model.method, hanafi: model.hanafi)   // counts start again after Fajr, Asr…
+            handleOpen(store.openRequest)
+        }
+        .onChange(of: store.openRequest) { _, r in handleOpen(r) }
+        .onChange(of: store.kahfRequest) { _, _ in opened = nil; showMore = false; flipped = nil }
+    }
+
+    /// A tapped reminder: "morning", "evening", "afterPrayer" or "m:<section>"
+    private func handleOpen(_ r: String?) {
+        guard let r else { return }
+        store.openRequest = nil
+        opened = nil; showMore = false; flipped = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            if r.hasPrefix("m:") { moreStart = Int(r.dropFirst(2)); showMore = true }
+            else if let c = AzkharCategory(rawValue: r) { opened = c }
         }
     }
 
@@ -217,7 +154,7 @@ struct AzkharCollectionsView: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showMore = true
         } label: {
-            centredTile(count: MoreAzkar.groups.count) {
+            centredTile(items: MoreAzkar.groups.flatMap { $0.items.map { (id: $0.id, times: $0.n) } }) {
                 Text("📚").font(.system(size: 28))
                     .frame(width: 52, height: 52)
                     .background(Theme.mintDeep.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -235,25 +172,31 @@ struct AzkharCollectionsView: View {
 
     private func tile(_ c: AzkharCategory) -> some View {
         let isFlipped = flipped == c
-        let n = AzkharData.items(c.rawValue).count
-        return Button {
+        let n = AzkharData.items(c.rawValue).map { (id: $0.id, times: $0.times) }
+        return ZStack {
+            front(c, n).opacity(isFlipped ? 0 : 1)
+            back(c).opacity(isFlipped ? 1 : 0).rotation3DEffect(.degrees(180), axis: (0, 1, 0))
+        }
+        .frame(height: 168)
+        .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (0, 1, 0), perspective: 0.6)
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .onTapGesture {
             guard flipped == nil else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             withAnimation(.easeInOut(duration: 0.45)) { flipped = c }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { opened = c }
-        } label: {
-            ZStack {
-                front(c, n).opacity(isFlipped ? 0 : 1)
-                back(c).opacity(isFlipped ? 1 : 0).rotation3DEffect(.degrees(180), axis: (0, 1, 0))
-            }
-            .frame(height: 168)
-            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (0, 1, 0), perspective: 0.6)
         }
-        .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: 0.6) {
+            // Long-press: ask "reset the counter for …?" (only when something was counted)
+            guard n.contains(where: { store.n($0.id) > 0 }) else { return }
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            askReset = (c.title(langID), n.map(\.id))
+        }
+        .accessibilityAddTraits(.isButton)
     }
 
-    private func front(_ c: AzkharCategory, _ n: Int) -> some View {
-        centredTile(count: n) {
+    private func front(_ c: AzkharCategory, _ n: [(id: String, times: Int)]) -> some View {
+        centredTile(items: n) {
             CatIcon(cat: c, size: 26).foregroundStyle(Theme.mintDeep)
                 .frame(width: 52, height: 52)
                 .background(Theme.mintDeep.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -266,14 +209,14 @@ struct AzkharCollectionsView: View {
     }
 
     /// Icon and title in the middle of the card, the number of azkar in the top corner.
-    private func centredTile<I: View, T: View>(count: Int, @ViewBuilder icon: () -> I, @ViewBuilder title: () -> T) -> some View {
+    private func centredTile<I: View, T: View>(items: [(id: String, times: Int)], @ViewBuilder icon: () -> I, @ViewBuilder title: () -> T) -> some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 10) {
                 icon()
                 title().multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text("\(count)").font(.sys(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Theme.muted)
+            AzkarProgressBadge(items: items)
         }
         .padding(16)
     }

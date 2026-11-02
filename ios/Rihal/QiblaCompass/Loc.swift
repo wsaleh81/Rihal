@@ -9,7 +9,7 @@ enum Loc {
     static var dateLocale: Locale { Locale(identifier: ar ? "ar-u-nu-latn" : (hasUI ? "\(langID)-u-nu-latn" : "en_GB")) }
     /// Translated message template ({0}, {1} are replaced). Falls back to the English template.
     static func f(_ t: String, _ a: String...) -> String {
-        var x = LocX.tpl[langID]?[t] ?? t
+        var x = LocX.tpl[langID]?[t] ?? LocNew.ui[langID]?[t] ?? t
         for (i, v) in a.enumerated() { x = x.replacingOccurrences(of: "{\(i)}", with: v) }
         return x
     }
@@ -72,4 +72,7 @@ enum Loc {
     ]
 }
 
-func L(_ s: String) -> String { Loc.ar ? (Loc.map[s] ?? s) : (LocX.ui[Loc.langID]?[s] ?? s) }
+func L(_ s: String) -> String {
+    let id = Loc.langID
+    return Loc.ar ? (Loc.map[s] ?? LocNew.ui["ar"]?[s] ?? s) : (LocX.ui[id]?[s] ?? LocNew.ui[id]?[s] ?? s)
+}

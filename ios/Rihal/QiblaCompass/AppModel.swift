@@ -24,6 +24,12 @@ final class AppModel: ObservableObject {
     @AppStorage("notifOn") var notifOn = true
     @AppStorage("notifBefore") var notifBefore = 0
     @AppStorage("notifSunrise") var notifSunrise = false
+    @AppStorage("adhanSound") var adhanSound = "adhan"
+    @AppStorage("fajrSound") var fajrSound = "adhan"
+    @AppStorage("azMorning") var azMorning = true
+    @AppStorage("azEvening") var azEvening = true
+    @AppStorage("azPrayer") var azPrayer = false
+    @AppStorage("azFriday") var azFriday = true
 
     @Published var tab = 0
     /// when the app went to the background; after 5 minutes away it opens on Prayer Times again
@@ -48,7 +54,15 @@ final class AppModel: ObservableObject {
             DispatchQueue.main.async { self?.objectWillChange.send(); self?.handleFix() }
         }.store(in: &bag)
         refreshLocation()
+        // A finished (or reset) azkar set changes today's reminders; wait a moment so a run of taps rebuilds once.
+        AzkarStore.shared.onSetChange = { [weak self] in
+            self?.pendingReschedule?.cancel()
+            let w = DispatchWorkItem { self?.rescheduleNotifications() }
+            self?.pendingReschedule = w
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: w)
+        }
     }
+    private var pendingReschedule: DispatchWorkItem?
 
     // MARK: place
     private func decode(_ s: String) -> Place? { s.isEmpty ? nil : (try? JSONDecoder().decode(Place.self, from: Data(s.utf8))) }
@@ -145,11 +159,12 @@ final class AppModel: ObservableObject {
         let offs = Prayer.allCases.map { String(d.integer(forKey: "off_" + $0.rawValue)) }.joined(separator: ",")
         let mutes = Prayer.allCases.map { (isMuted($0) ? "1" : "0") + (isAlarm($0) ? "a" : "") }.joined()
         let p = place
-        return "\(notifOn)|\(notifBefore)|\(mutes)|\(methodID)|\(hanafi)|\(offs)|\(String(format: "%.1f,%.1f", p.lat, p.lon))|\(AppLang.current.id)"
+        return "\(notifOn)|\(notifBefore)|\(mutes)|\(methodID)|\(hanafi)|\(offs)|\(String(format: "%.1f,%.1f", p.lat, p.lon))|\(AppLang.current.id)|\(adhanSound)|\(fajrSound)|\(azMorning)\(azEvening)\(azPrayer)\(azFriday)"
     }
     func rescheduleNotifications() {
         Notifier.schedule(place: place, method: method, hanafi: hanafi, on: notifOn, before: notifBefore,
                           muted: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, isMuted($0)) }),
-                          alarm: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, isAlarm($0)) }))
+                          alarm: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, isAlarm($0)) }),
+                          opt: .init(sound: adhanSound, fajrSound: fajrSound, morning: azMorning, evening: azEvening, afterPrayer: azPrayer, friday: azFriday))
     }
 }

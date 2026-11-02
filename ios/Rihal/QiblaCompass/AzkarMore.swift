@@ -12,6 +12,8 @@ struct MoreAzkarItem: Decodable, Identifiable {
     let h: String?
     let tr: [String: String]?
     let ht: [String: String]?
+    /// Friday: shows a "Read Surat al-Kahf" button that opens the Mushaf
+    let kahf: Bool?
 
     /// Translation for a non-Arabic app language (Arabic only when the app is in Arabic).
     func translation(_ lang: String) -> String? { lang == "ar" ? nil : (tr?[lang] ?? tr?["en"]) }
@@ -92,7 +94,8 @@ struct PrayerRugIcon: View {
 /// Grid of the 24 sections; tapping one opens its azkar in the same screen.
 struct MoreAzkarView: View {
     @AppStorage("langID") private var langID = "ar"
-    @Binding var counts: [String: Int]
+    /// Section to open straight away (from a reminder)
+    var start: Int? = nil
     var onClose: () -> Void
     @State private var openGroup: MoreAzkarGroup? = nil
 
@@ -101,7 +104,7 @@ struct MoreAzkarView: View {
     var body: some View {
         Group {
             if let g = openGroup {
-                MoreAzkarListView(group: g, counts: $counts, onClose: { withAnimation(.easeInOut(duration: 0.25)) { openGroup = nil } })
+                MoreAzkarListView(group: g, onClose: { withAnimation(.easeInOut(duration: 0.25)) { openGroup = nil } })
                     .transition(.move(edge: .trailing))
             } else {
                 grid.transition(.move(edge: .leading))
@@ -146,7 +149,7 @@ struct MoreAzkarView: View {
 
     private func tile(_ g: MoreAzkarGroup) -> some View {
         VStack(spacing: 6) {
-            HStack { Spacer(); Text("\(g.items.count)").font(.sys(size: 12, weight: .bold, design: .rounded)).foregroundStyle(Theme.muted) }
+            HStack { Spacer(); AzkarProgressBadge(items: g.items.map { (id: $0.id, times: $0.n) }) }
             MoreAzkarIcon(icon: g.icon, size: 32).frame(height: 40)
             Text(g.title(langID)).font(.sys(size: 15, weight: .bold, design: Theme.design)).foregroundStyle(Theme.ink)
                 .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
@@ -159,100 +162,20 @@ struct MoreAzkarView: View {
     }
 }
 
-/// Azkar of one section: tap a card to count, like the main collections.
+/// Azkar of one section: the same counting list as the main collections.
 struct MoreAzkarListView: View {
     @AppStorage("langID") private var langID = "ar"
     let group: MoreAzkarGroup
-    @Binding var counts: [String: Int]
     var onClose: () -> Void
 
-    private var doneText: String {
-        switch langID {
-        case "ar": "تم"; case "tr": "Tamam"; case "fr": "Terminé"; case "it": "Fatto"
-        case "de": "Fertig"; case "nl": "Klaar"; case "es": "Hecho"; default: LocX.done[langID] ?? "Done"
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button(action: onClose) {
-                    Image(systemName: "chevron.left").font(.sys(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.ink).frame(width: 40, height: 40)
-                        .background(Theme.tile, in: Circle())
-                }
-                MoreAzkarIcon(icon: group.icon, size: 20)
-                Text(group.title(langID)).font(.sys(size: 21, weight: .bold, design: Theme.design)).foregroundStyle(Theme.ink)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                Spacer()
-            }
-            .padding(.horizontal, 20).padding(.vertical, 12)
-            ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(group.items) { d in
-                        if let h = d.heading(langID) {
-                            let rtl = langID == "ar" || langID == "ur"
-                            Text(h).font(.sys(size: 15, weight: .heavy)).foregroundStyle(Theme.mintDeep)
-                                .multilineTextAlignment(rtl ? .trailing : .leading)
-                                .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading).environment(\.layoutDirection, .leftToRight)
-                                .padding(.top, 6)
-                        }
-                        card(d)
-                    }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 24)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .background(Theme.bg.ignoresSafeArea())
-        .contentShape(Rectangle())
-        .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { v in
-            if v.translation.width > 80 && abs(v.translation.width) > 1.6 * abs(v.translation.height) { onClose() }
-        })
-    }
-
-    private func card(_ d: MoreAzkarItem) -> some View {
-        let n = counts[d.id] ?? 0
-        let done = n >= d.n
-        return Button {
-            if n < d.n { counts[d.id] = n + 1; UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-        } label: {
-            VStack(spacing: 10) {
-                JustifiedText(text: d.ar, size: 19 * Theme.azkarScale, color: UIColor(Theme.ink), lineSpacing: 9, markColor: UIColor(Theme.mintDeep))
-                if let t = d.translation(langID) {
-                    Divider().overlay(Theme.line)
-                    Text(t).font(.sys(size: 18 * Theme.azkarScale)).lineSpacing(4).foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if let note = d.note {
-                    Text(note).font(.sys(size: 13 * Theme.azkarScale)).foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.trailing).frame(maxWidth: .infinity, alignment: .trailing)
-                        .environment(\.layoutDirection, .leftToRight)
-                }
-                Text(d.ref).font(.sys(size: 12, weight: .medium)).foregroundStyle(Theme.mintDeep)
-                    .frame(maxWidth: .infinity, alignment: .trailing).environment(\.layoutDirection, .leftToRight)
-                HStack(spacing: 10) {
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Theme.tile)
-                        GeometryReader { g in Capsule().fill(Theme.mint).frame(width: g.size.width * CGFloat(min(n, d.n)) / CGFloat(max(d.n, 1))) }
-                    }
-                    .frame(height: 6)
-                    Text(done ? doneText : "\(n) / \(d.n)")
-                        .font(.sys(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(done ? Theme.mintDeep : Theme.ink).monospacedDigit()
-                    if n > 0 {
-                        Button { counts[d.id] = 0 } label: {
-                            Image(systemName: "arrow.counterclockwise").font(.sys(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
-                                .frame(width: 28, height: 28)
-                        }
-                    }
-                }
-            }
-            .padding(16)
-            .background(done ? Theme.rowNow : Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(done ? Theme.mint.opacity(0.5) : Theme.line, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
+        AzkarListView(
+            title: group.title(langID),
+            rows: group.items.map {
+                AzkarRow(id: $0.id, heading: $0.heading(langID), arabic: $0.ar, translation: $0.translation(langID),
+                         note: $0.note, ref: $0.ref, times: $0.n, kahf: $0.kahf ?? false)
+            },
+            icon: { MoreAzkarIcon(icon: group.icon, size: 20) },
+            onClose: onClose)
     }
 }

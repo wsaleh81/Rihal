@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var showOffsets = false
     @State private var showFonts = false
     @State private var notifDenied = false
+    @State private var openHint: String? = nil
     @AppStorage("tempUnit") private var tempUnit = "c"
     @AppStorage("compassStyle") private var compassStyle = "classic"
 
@@ -43,68 +44,71 @@ struct SettingsView: View {
                         .padding(.vertical, 14)
                     }
 
-                    header(L("accessibility"))
+                    header(L("Language & text"))
                     group {
-                        VStack(alignment: .leading, spacing: 0) {
-                            HStack(spacing: 14) {
-                                icon("textformat.size")
-                                Text(L("Text size")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                                Spacer()
-                                Menu {
-                                    Picker(L("Text size"), selection: $model.textSize) {
-                                        Text(L("Auto (iPhone setting)")).tag("auto")
-                                        Text(L("Standard")).tag("1")
-                                        Text(L("Large")).tag("1.2")
-                                        Text(L("Larger")).tag("1.4")
-                                        Text(L("Largest")).tag("1.6")
-                                    }
-                                } label: { menuValue(textSizeName) }
-                            }.frame(minHeight: 56)
-                            divider
-                            HStack(spacing: 14) {
-                                icon("book")
-                                Text(L("Azkhar text size")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                                Spacer()
-                                Menu {
-                                    Picker(L("Azkhar text size"), selection: $model.azkarSize) {
-                                        Text(L("Standard")).tag("1")
-                                        Text(L("Large")).tag("1.25")
-                                        Text(L("Larger")).tag("1.5")
-                                        Text(L("Largest")).tag("2")
-                                    }
-                                } label: { menuValue(azkarSizeName) }
-                            }.frame(minHeight: 56)
-                            divider
-                            HStack(spacing: 14) {
-                                icon("bold")
-                                Toggle(L("Bold text"), isOn: $model.boldText).tint(Theme.mintDeep)
-                            }.frame(minHeight: 56)
-                        }
-                    }
-
-                    header(L("language"))
-                    group {
+                        // The sample sentence shows the chosen font, size and weight at once.
+                        Text("لَا إِلَٰهَ إِلَّا اللَّهُ مُحَمَّدٌ رَسُولُ اللَّهِ")
+                            .font(.sys(size: 22))
+                            .foregroundStyle(Theme.mintDeep)
+                            .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.6)
+                            .padding(.horizontal, 10).padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, minHeight: 64)
+                            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .padding(.top, 14).padding(.bottom, 6)
+                            .environment(\.layoutDirection, .rightToLeft)
                         HStack(spacing: 14) {
                             icon("globe")
-                            Text(L("Application language")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                            Spacer()
+                            title("Application language")
+                            Spacer(minLength: 8)
                             Menu {
                                 Picker(L("Language"), selection: $model.langID) {
-                                    ForEach(AppLang.all) { Text($0.title).tag($0.id) }
+                                    ForEach(AppLang.all) { Text($0.native).tag($0.id) }
                                 }
-                            } label: { menuValue(Loc.ar ? "العربية" : (AppLang.current.title.components(separatedBy: " · ").last ?? "")) }
+                            } label: { menuValue(AppLang.current.native) }
                         }.frame(minHeight: 56)
-                        Divider().overlay(Theme.line.opacity(0.5))
+                        divider
                         Button { showFonts = true } label: {
                             HStack(spacing: 14) {
                                 icon("textformat")
-                                Text(L("App font")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                                Spacer()
-                                Text(AppFont.current?.title ?? L("System default")).font(.sys(size: 17)).foregroundStyle(Theme.muted).lineLimit(1)
-                                Image(systemName: "chevron.forward").font(.sys(size: 14, weight: .semibold)).foregroundStyle(Theme.muted)
+                                title("App font")
+                                Spacer(minLength: 8)
+                                Text(AppFont.current?.title ?? L("System default")).font(.sys(size: 15)).foregroundStyle(Theme.muted)
+                                    .lineLimit(1).minimumScaleFactor(0.7)
+                                Image(systemName: "chevron.forward").font(.sys(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
                             }
                             .frame(minHeight: 56).contentShape(Rectangle())
                         }.buttonStyle(.plain)
+                        divider
+                        HStack(spacing: 14) {
+                            icon("textformat.size")
+                            title("Text size")
+                            Spacer(minLength: 8)
+                            Menu {
+                                Picker(L("Text size"), selection: $model.textSize) {
+                                    Text(L("Auto (iPhone setting)")).tag("auto")
+                                    Text(L("Standard")).tag("1")
+                                    Text(L("Large")).tag("1.2")
+                                    Text(L("Larger")).tag("1.4")
+                                    Text(L("Largest")).tag("1.6")
+                                }
+                            } label: { menuValue(textSizeName) }
+                        }.frame(minHeight: 56)
+                        divider
+                        HStack(spacing: 14) {
+                            icon("book")
+                            title("Azkhar text size")
+                            Spacer(minLength: 8)
+                            Menu {
+                                Picker(L("Azkhar text size"), selection: $model.azkarSize) {
+                                    Text(L("Standard")).tag("1")
+                                    Text(L("Large")).tag("1.25")
+                                    Text(L("Larger")).tag("1.5")
+                                    Text(L("Largest")).tag("2")
+                                }
+                            } label: { menuValue(azkarSizeName) }
+                        }.frame(minHeight: 56)
+                        divider
+                        toggleRow("bold", "Bold text", $model.boldText)
                     }
 
                     header(L("prayers"))
@@ -140,13 +144,13 @@ struct SettingsView: View {
                         TimelineView(.everyMinute) { ctx in
                             HStack(spacing: 14) {
                                 icon("clock")
-                                Text(L("Local time")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                                Spacer()
-                                Text(localClock(ctx.date, model.place.timeZone)).font(.sys(size: 17)).foregroundStyle(Theme.muted).monospacedDigit()
+                                hintTitle("Local time", key: "tz")
+                                Spacer(minLength: 8)
+                                Text(localClock(ctx.date, model.place.timeZone)).font(.sys(size: 15)).foregroundStyle(Theme.muted).monospacedDigit()
+                                    .lineLimit(1).minimumScaleFactor(0.7)
                             }.frame(minHeight: 56)
                         }
-                        Text(Loc.ar ? "الصلاة والقبلة والمساجد والطقس كلها تعتمد على هذا الموقع. المنطقة الزمنية: \(model.place.tz)" : Loc.f("Prayer times, Qibla, mosques and weather all use this location. Time zone: {0}", model.place.tz))
-                            .font(.footnote).foregroundStyle(Theme.muted).sideAligned().padding(.bottom, 10)
+                        hintText("tz", Loc.ar ? "الصلاة والقبلة والمساجد والطقس كلها تعتمد على هذا الموقع. المنطقة الزمنية: \(model.place.tz)" : Loc.f("Prayer times, Qibla, mosques and weather all use this location. Time zone: {0}", model.place.tz))
                         if model.location.denied {
                             Text(L("Location is off for this app. Turn it on in iPhone Settings, or choose a city."))
                                 .font(.footnote).foregroundStyle(Theme.muted).sideAligned().padding(.bottom, 10)
@@ -156,8 +160,8 @@ struct SettingsView: View {
                         divider
                         HStack(spacing: 14) {
                             icon("function")
-                            Text(L("Method")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                            Spacer()
+                            title("Method")
+                            Spacer(minLength: 8)
                             Menu {
                                 Picker(L("Method"), selection: $model.methodID) {
                                     ForEach(CalcMethod.all) { Text(L($0.name)).tag($0.id) }
@@ -169,31 +173,26 @@ struct SettingsView: View {
                             row("plusminus.circle", "Adjust times", "minutes", chevron: true)
                         }
                         divider
-                        HStack(spacing: 14) {
-                            icon("sun.max")
-                            Toggle(L("Hanafi Asr"), isOn: $model.hanafi).tint(Theme.mintDeep)
-                                .font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                        }.frame(minHeight: 56)
+                        toggleRow("sun.max", "Hanafi Asr", $model.hanafi)
                         divider
-                        HStack(spacing: 14) {
-                            icon("eye")
-                            Toggle(L("Show current prayer (Now)"), isOn: $model.showNow).tint(Theme.mintDeep)
-                                .font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                        }.frame(minHeight: 56)
+                        toggleRow("eye", "Show current prayer (Now)", $model.showNow)
                     }
 
-                    header(L("notifications"))
+                    header(L("Notifications & reminders"))
                     group {
                         HStack(spacing: 14) {
                             icon("bell")
-                            Toggle(L("Adhan alerts"), isOn: Binding(
+                            hintTitle("Adhan alerts", key: "alerts")
+                            Spacer(minLength: 8)
+                            Toggle("", isOn: Binding(
                                 get: { model.notifOn },
                                 set: { on in
                                     model.notifOn = on
                                     if on { Notifier.requestAuth { _ in refreshNotifStatus(); model.rescheduleNotifications() } }
-                                })).tint(Theme.mintDeep)
-                                .font(.sys(size: 17)).foregroundStyle(Theme.ink)
+                                })).labelsHidden().tint(Theme.mintDeep)
                         }.frame(minHeight: 56)
+                        hintText("alerts", Loc.ar ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان."
+                                                 : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it."))
                         if model.notifOn && notifDenied {
                             Text(L("Notifications are off for this app in iPhone Settings."))
                                 .font(.footnote).foregroundStyle(Theme.muted)
@@ -202,21 +201,17 @@ struct SettingsView: View {
                             }.padding(.bottom, 10)
                         }
                         divider
-                        HStack(spacing: 14) {
-                            icon("speaker.wave.2")
-                            Text(Loc.ar ? "صوت الأذان" : L("Adhan sound")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                            Spacer()
-                            Button { Notifier.previewAzan() } label: {
-                                Image(systemName: "play.circle.fill").font(.sys(size: 26)).foregroundStyle(Theme.mintDeep)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Loc.ar ? "استماع" : "Play")
-                        }.frame(minHeight: 56)
+                        soundRow("speaker.wave.2", Loc.ar ? "الأذان" : L("Adhan sound"), $model.adhanSound, Notifier.sounds.map(\.key), hint: "sound")
+                        hintText("sound", Loc.ar ? "يسمح الآيفون بـ٣٠ ثانية فقط لصوت التنبيه، لذلك يُسمع أول الأذان الكامل."
+                                                : L("iPhone plays at most 30 seconds for an alert, so you hear the start of a complete adhan."))
+                        divider
+                        soundRow("sunrise", Loc.ar ? "أذان الفجر" : L("Fajr adhan"), $model.fajrSound,
+                                 [Notifier.sounds[0].key] + Notifier.fajrSounds.map(\.key) + Notifier.sounds.dropFirst().map(\.key), hint: nil)
                         divider
                         HStack(spacing: 14) {
                             icon("clock.badge")
-                            Text(L("Remind me before")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                            Spacer()
+                            title("Remind me before")
+                            Spacer(minLength: 8)
                             Menu {
                                 Picker(L("Remind"), selection: $model.notifBefore) {
                                     Text(L("Off")).tag(0)
@@ -225,22 +220,27 @@ struct SettingsView: View {
                             } label: { menuValue(model.notifBefore == 0 ? L("Off") : "\(model.notifBefore) " + L("min")) }
                         }.frame(minHeight: 56)
                         divider
-                        HStack(spacing: 14) {
-                            icon("sunrise")
-                            Toggle(L("Sunrise alert"), isOn: $model.notifSunrise).tint(Theme.mintDeep)
-                                .font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                        }.frame(minHeight: 56)
+                        toggleRow("sunrise", "Sunrise alert", $model.notifSunrise)
+                        divider
+                        toggleRow("sun.horizon", Loc.ar ? "تذكير أذكار الصباح" : "Morning azkar reminder", $model.azMorning, hint: "azm")
+                        hintText("azm", Loc.ar ? "بعد الفجر بـ١٥ دقيقة، ثم كل ساعتين حتى الظهر. يتوقف عند إكمال أذكار الصباح." : L("15 min after Fajr, then every 2 hours until Dhuhr. Stops once you finish the morning azkar."))
+                        divider
+                        toggleRow("sunset", Loc.ar ? "تذكير أذكار المساء" : "Evening azkar reminder", $model.azEvening, hint: "aze")
+                        hintText("aze", Loc.ar ? "بعد العصر بـ١٥ دقيقة، ثم كل ساعتين حتى العشاء. يتوقف عند إكمال أذكار المساء." : L("15 min after Asr, then every 2 hours until Isha. Stops once you finish the evening azkar."))
+                        divider
+                        toggleRow("hands.sparkles", Loc.ar ? "تذكير أذكار بعد الصلاة" : "After-prayer azkar reminder", $model.azPrayer, hint: "azp")
+                        hintText("azp", Loc.ar ? "بعد كل صلاة بـ١٥ دقيقة، إذا لم تكمل أذكار بعد الصلاة." : L("15 min after each prayer, if you haven't finished the after-prayer azkar."))
+                        divider
+                        toggleRow("book.closed", Loc.ar ? "تذكير يوم الجمعة" : "Friday reminder", $model.azFriday, hint: "azf")
+                        hintText("azf", Loc.ar ? "سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Surat al-Kahf 2½ hours before Dhuhr, and the hour of dua 1 hour before Maghrib."))
                     }
-                    Text(Loc.ar ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان."
-                                : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it."))
-                        .font(.sys(size: 12)).foregroundStyle(Theme.muted).sideAligned().padding(.horizontal, 6)
 
                     header(L("units"))
                     group {
                         HStack(spacing: 14) {
                             icon("thermometer.medium")
-                            Text(L("Temperature")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                            Spacer()
+                            title("Temperature")
+                            Spacer(minLength: 8)
                             Menu {
                                 Picker(L("Temperature"), selection: $tempUnit) {
                                     Text(L("Celsius (°C)")).tag("c")
@@ -274,6 +274,51 @@ struct SettingsView: View {
     }
 
     // MARK: pieces
+    /// Row title on one line: long titles shrink a little instead of wrapping.
+    private func title(_ t: String) -> some View {
+        Text(L(t)).font(.sys(size: 17)).foregroundStyle(Theme.ink).lineLimit(1).minimumScaleFactor(0.7)
+    }
+    /// A title with a small ⓘ: tapping it shows or hides the note under the row.
+    private func hintTitle(_ t: String, key: String) -> some View {
+        Button { withAnimation(.easeInOut(duration: 0.2)) { openHint = openHint == key ? nil : key } } label: {
+            HStack(spacing: 6) {
+                title(t)
+                Image(systemName: "info.circle").font(.sys(size: 13)).foregroundStyle(Theme.muted.opacity(0.7))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+    @ViewBuilder private func hintText(_ key: String, _ text: String) -> some View {
+        if openHint == key {
+            Text(text).font(.footnote).foregroundStyle(Theme.muted).sideAligned().padding(.bottom, 10)
+                .transition(.opacity)
+        }
+    }
+    private func toggleRow(_ ic: String, _ t: String, _ v: Binding<Bool>, hint: String? = nil) -> some View {
+        HStack(spacing: 14) {
+            icon(ic)
+            if let hint { hintTitle(t, key: hint) } else { title(t) }
+            Spacer(minLength: 8)
+            Toggle("", isOn: v).labelsHidden().tint(Theme.mintDeep)
+        }.frame(minHeight: 56)
+    }
+    /// Sound picker with a play button (a second tap stops the preview).
+    private func soundRow(_ ic: String, _ t: String, _ v: Binding<String>, _ keys: [String], hint: String?) -> some View {
+        HStack(spacing: 10) {
+            icon(ic)
+            if let hint { hintTitle(t, key: hint) } else { title(t) }
+            Spacer(minLength: 6)
+            Menu {
+                Picker(t, selection: v) { ForEach(keys, id: \.self) { Text(Notifier.label($0)).tag($0) } }
+            } label: { menuValue(Notifier.label(v.wrappedValue)) }
+            Button { Notifier.preview(v.wrappedValue) } label: {
+                Image(systemName: "play.circle.fill").font(.sys(size: 26)).foregroundStyle(Theme.mintDeep)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Loc.ar ? "استماع" : "Play")
+        }.frame(minHeight: 56)
+    }
     private func refreshNotifStatus() { Notifier.status { notifDenied = ($0 == .denied) } }
     private var textSizeName: String {
         switch model.textSize { case "auto": return L("Auto"); case "1.2": return L("Large"); case "1.4": return L("Larger"); case "1.6": return L("Largest"); default: return L("Standard") }
@@ -282,9 +327,9 @@ struct SettingsView: View {
         switch model.azkarSize { case "1.25": return L("Large"); case "1.5": return L("Larger"); case "2": return L("Largest"); default: return L("Standard") }
     }
     private func menuValue(_ t: String) -> some View {
-        HStack(spacing: 6) {
-            Text(L(t)).font(.sys(size: 17)).foregroundStyle(Theme.muted).lineLimit(1).fixedSize()
-            Image(systemName: "chevron.up.chevron.down").font(.sys(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
+        HStack(spacing: 4) {
+            Text(L(t)).font(.sys(size: 15)).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.7)
+            Image(systemName: "chevron.up.chevron.down").font(.sys(size: 11, weight: .semibold)).foregroundStyle(Theme.muted)
         }
     }
     private func shortMethod(_ n: String) -> String {

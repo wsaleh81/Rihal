@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
@@ -59,8 +60,9 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.25), value: model.welcomed)
         .onChange(of: phase) { _, p in
             if p == .active {
-                if let t = model.leftAt, Date().timeIntervalSince(t) > 300 { model.tab = 0 }
+                if let t = model.leftAt, Date().timeIntervalSince(t) > 300, AzkarStore.shared.openRequest == nil { model.tab = 0 }
                 model.leftAt = nil
+                AzkarStore.shared.sync(place: model.place, method: model.method, hanafi: model.hanafi)
                 model.refreshLocation(); model.rescheduleNotifications(); model.refreshWeather()
                 if model.tab == 0 || model.tab == 1 { model.location.startHeading() }
             } else if p == .background {
@@ -70,6 +72,14 @@ struct RootView: View {
         }
         .onChange(of: model.location.coordinate?.latitude) { _, _ in model.refreshWeather() }
         .onChange(of: model.notifKey) { _, _ in model.rescheduleNotifications() }
+        // A tapped azkar reminder opens the Azkar tab (the list itself opens there); the Kahf button opens the Mushaf.
+        .onReceive(AzkarStore.shared.$openRequest) { r in
+            guard r != nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { if model.tab != 4 { model.tab = 4 } }
+        }
+        .onReceive(AzkarStore.shared.$kahfRequest.dropFirst()) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { model.tab = 5 }
+        }
         .task(id: model.welcomed) {
             guard model.welcomed else { return }
             try? await Task.sleep(nanoseconds: 1_500_000_000)

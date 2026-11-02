@@ -187,4 +187,6 @@ struct AppLang: Identifiable, Hashable {
         return all.first { $0.id == id } ?? all[0]
     }
     var isRTL: Bool { id == "ar" || id == "ur" }
+    /// The language's own name only ("Türkçe"), as in the language picker.
+    var native: String { title.components(separatedBy: " · ").first ?? title }
 }

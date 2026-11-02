@@ -340,6 +340,14 @@ async function checkBattery() {
   try { const r = await NativeWidget.batteryStatus(); battOK = !!r.ignoring; exactOK = !!r.exact; } catch (e) {}
 }
 async function askBattery() { if (!NativeWidget) return; try { await NativeWidget.requestBattery(); } catch (e) {} }
+// Explain first, then open Android's Allow / Deny question.
+function explainBattery() {
+  return new Promise(done => confirmBox(
+    ar() ? "سيسألك الهاتف الآن عن السماح لرحّال بالعمل دون قيود توفير البطارية. اختر «السماح» حتى يصل الأذان والتذكيرات في وقتها تمامًا، ولا يؤثر ذلك على البطارية إلا قليلًا."
+      : L("Your phone will now ask to let Rihal run without battery-saving limits. Choose Allow so the adhan and reminders arrive exactly on time. It uses very little battery."),
+    async () => { await askBattery(); done(); },
+    { title: ar() ? "لكي يصل الأذان في وقته" : L("So the adhan arrives on time"), yes: ar() ? "متابعة" : L("Continue"), no: ar() ? "لاحقًا" : L("Later"), good: true }));
+}
 // First start (and every start while alerts are on): ask for notification permission, like the iPhone app does.
 async function ensureAlertPermission() {
   if (!nativeOK() || !S.notif) return;
@@ -350,7 +358,7 @@ async function ensureAlertPermission() {
   } catch (e) {}
   await checkBattery();
   // Ask once by itself (the system shows Allow / Deny); after that the Settings row offers it.
-  if (!battOK && !S.battAsked && !alertsDenied) { S.battAsked = true; save(); await askBattery(); }
+  if (!battOK && !S.battAsked && !alertsDenied) { S.battAsked = true; save(); explainBattery(); }
   await scheduleAlerts(); if (S.tab === 4) render();
 }
 async function azkarPermission() {
@@ -948,9 +956,9 @@ function closeTasbih() {
   if (el && el.classList.contains("fin")) setTimeout(() => nextCard(el), 200);
 }
 // Long-press a card (one dhikr) or a category tile (all its azkar) to reset it, after a yes/no question.
-function confirmBox(text, onYes) {
+function confirmBox(text, onYes, o2 = {}) {
   let o = $("#cbox"); if (!o) { o = document.createElement("div"); o.id = "cbox"; document.body.appendChild(o); }
-  o.innerHTML = `<div class="cbg"></div><div class="cpanel"><p>${esc(text)}</p><div class="cbtns"><button class="cno">${ar() ? "لا" : L("No")}</button><button class="cyes">${ar() ? "نعم" : L("Yes")}</button></div></div>`;
+  o.innerHTML = `<div class="cbg"></div><div class="cpanel">${o2.title ? `<h3>${esc(o2.title)}</h3>` : ""}<p>${esc(text)}</p><div class="cbtns"><button class="cno">${esc(o2.no || (ar() ? "لا" : L("No")))}</button><button class="cyes ${o2.good ? "good" : ""}">${esc(o2.yes || (ar() ? "نعم" : L("Yes")))}</button></div></div>`;
   o.classList.add("on");
   const close = () => o.classList.remove("on");
   o.querySelector(".cno").onclick = close; o.querySelector(".cbg").onclick = close;
@@ -1039,7 +1047,7 @@ const ACT = {
   resetOff() { S.off = {}; save(); scheduleAlerts(); render(); },
   playAdhan(el) { playAdhan(S[el.dataset.k]); },
   askExact() { askExact(); },
-  async fixAlerts() { if (!battOK) await askBattery(); else await askExact(); },
+  async fixAlerts() { if (!battOK) explainBattery(); else await askExact(); },
   adj(el) { const k = el.dataset.k; S.off = { ...offs(), [k]: Math.max(-60, Math.min(60, (offs()[k] || 0) + +el.dataset.d)) }; save(); scheduleAlerts(); render(); },
 };
 document.addEventListener("click", e => { const el = e.target.closest("[data-act]"); if (el && ACT[el.dataset.act]) { if (el.tagName === "A") return; ACT[el.dataset.act](el); } });

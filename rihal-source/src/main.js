@@ -856,7 +856,7 @@ function fitSettings() {
   const c = document.createElement("canvas").getContext("2d");
   document.querySelectorAll("#view .irow select").forEach(s => {
     const t = s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : "";
-    fit(s, () => { c.font = getComputedStyle(s).font; return c.measureText(t).width + 30 > s.clientWidth; }, 0.95, 0.7);
+    fit(s, () => { c.font = getComputedStyle(s).font; return c.measureText(t).width + 26 > s.clientWidth; }, 0.88, 0.7);
   });
 }
 function vibr(p = 12) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
@@ -939,8 +939,7 @@ function tileItems(el) {
     t = setTimeout(() => {
       if (card) {
         const id = card.dataset.id, d = findDhikr(id); if (!azkarCounts[id] || !d) return;
-        lpFired = true; vibr(30);
-        confirmBox(resetQ(shortAr(d.ar)), () => { addCount(id, -(azkarCounts[id] || 0)); vibr(50); });
+        lpFired = true; addCount(id, -(azkarCounts[id] || 0)); vibr(50);      // one dhikr: reset straight away
       } else {
         const g = tileItems(tile); if (!g || !g.items.some(d => azkarCounts[d.id])) return;
         lpFired = true; vibr(30);

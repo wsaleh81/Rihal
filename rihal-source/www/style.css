@@ -301,3 +301,5 @@ body.inmush #app{max-width:none}
 .sndrow select{max-width:none}
 .irow select{padding:9px 8px}
 .sndrow{max-width:58%}
+.irow select{padding:6px 6px;border-radius:10px;font-size:.88rem;max-width:40%}
+.sndrow{max-width:54%}.sndrow select{max-width:none}

@@ -11,6 +11,15 @@ import android.view.WindowManager;
 import android.webkit.WebView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.appupdate.AppUpdateOptions;
+import com.google.android.play.core.install.model.AppUpdateType;
+import com.google.android.play.core.install.model.UpdateAvailability;
 import androidx.activity.OnBackPressedCallback;
 
 import com.getcapacitor.BridgeActivity;
@@ -20,6 +29,8 @@ public class MainActivity extends BridgeActivity {
     private static final long IDLE_CLOSE_MS = 5 * 60 * 1000L;
     private final Handler idle = new Handler(Looper.getMainLooper());
     private final Runnable closeApp = this::finishAndRemoveTask;
+    private AppUpdateManager updates;
+    private ActivityResultLauncher<IntentSenderRequest> updateLauncher;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -33,6 +44,10 @@ public class MainActivity extends BridgeActivity {
         EdgeToEdge.enable(this);
         // Back (button or swipe) goes to the previous page inside the app instead of closing it; the page decides.
         alarmMode(this, isAlarm(getIntent()));
+        // Forced update: when Google Play has a newer version for this user, its full-screen update page opens.
+        // Closing it without updating brings it straight back (the check runs again on resume).
+        updates = AppUpdateManagerFactory.create(this);
+        updateLauncher = registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(), r -> {});
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -63,6 +78,27 @@ public class MainActivity extends BridgeActivity {
         }
         if (on) a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else a.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        checkForUpdate();
+    }
+
+    private void checkForUpdate() {
+        if (updates == null || FajrAlarmService.ringing) return;     // never cover the Fajr alarm
+        try {
+            updates.getAppUpdateInfo().addOnSuccessListener(info -> {
+                int a = info.updateAvailability();
+                boolean ready = (a == UpdateAvailability.UPDATE_AVAILABLE && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE))
+                        || a == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS;
+                if (!ready) return;
+                try {
+                    updates.startUpdateFlowForResult(info, updateLauncher, AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build());
+                } catch (Exception ignored) {}
+            });
+        } catch (Exception ignored) {}
     }
 
     @Override

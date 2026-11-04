@@ -763,48 +763,88 @@ function viewOffsets() {
   <div class="sfoot" style="margin:0 6px 10px">${L("Add or subtract minutes to match your local mosque or official timetable.")}</div>
   <div class="card sbox">${rows}</div><button class="card resetb" data-act="resetOff">${ar() ? "إعادة الكل إلى 0" : L("Reset all to 0")}</button>`;
 }
+/* Settings: a short main page of big sections; each opens its own small page (easier for older users). */
+const SECT = [
+  ["loc", "pin", () => ar() ? "الموقع ومواقيت الصلاة" : L("Location & prayer times")],
+  ["adhan", "bell", () => ar() ? "الأذان والتنبيهات" : L("Adhan & alerts")],
+  ["fajr", "remind", () => ar() ? "منبّه الفجر" : L("Fajr alarm")],
+  ["azkar", "dua", () => ar() ? "الأذكار" : L("Azkhar")],
+  ["look", "palette", () => ar() ? "المظهر واللغة" : L("Appearance & language")],
+  ["about", "info", () => ar() ? "حول التطبيق" : L("About")],
+];
+function setSummary(k) {
+  const p = S.place, mt = METHODS.find(m => m.id === S.method);
+  const on = v => v ? (ar() ? "مفعّل" : L("On")) : (ar() ? "متوقف" : L("Off"));
+  if (k === "loc") return `${p.name} · ${mt ? L(mt.name) : ""}`;
+  if (k === "adhan") return `${on(S.notif)} · ${sndLabel(SOUNDS.find(x => x[0] === S.adhanSound) || SOUNDS[0])}`;
+  if (k === "fajr") { const st = (S.fajrStreak || {}).cur || 0, isOn = S.fajrOn && S.rugRef; return isOn ? `${on(true)} · ${ar() ? `${arN(st)} يومًا متتاليًا` : F("{0} days in a row", st)}` : on(false); }
+  if (k === "azkar") { const n = ["azMorning", "azEvening", "azPrayer", "azFriday"].filter(x => S[x]).length; return ar() ? `${arN(n)} تذكيرات مفعّلة · حجم الخط` : F("{0} reminders on · text size", n); }
+  if (k === "look") return `${(LANGS.find(x => x[0] === S.lang) || ["", ""])[1]} · ${(PALETTES.find(x => x.id === S.palette) || { title: "" }).title ? L((PALETTES.find(x => x.id === S.palette)).title) : ""}`;
+  if (k === "about") return `${ar() ? "رحّال" : "Rihal"} 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}`;
+  return "";
+}
+const subHead = t => `<div class="ahead"><button class="iconbtn" data-act="setBack">${rtl() ? I.right : I.left}</button><div class="atitle">${esc(t)}</div></div>`;
+const slab = t => `<div class="slab">${esc(t)}</div>`;
 function viewSettings() {
   if (setSub === "offsets") return viewOffsets();
+  const chevB = `<span class="schev">${rtl() ? I.left : I.right}</span>`;
+  if (!setSub) {
+    const big = ([k, ic, t]) => `<button class="bigrow" data-act="setGo" data-s="${k}"><span class="bic">${SIC[ic] || ""}</span><span class="bt"><b>${esc(t())}</b><small>${esc(setSummary(k))}</small></span>${chevB}</button>`;
+    const sec = SECT.filter(x => x[0] !== "fajr" || NativeWidget || !nativeOK());
+    return `${title("Settings", "الإعدادات")}
+    <div class="card sbox">${sec.filter(x => ["loc", "adhan", "fajr"].includes(x[0])).map(big).join("")}</div>
+    <div class="card sbox sgap">${sec.filter(x => ["azkar", "look"].includes(x[0])).map(big).join("")}</div>
+    <div class="card sbox sgap">${big(SECT[5])}</div>`;
+  }
+  const head = subHead(SECT.find(x => x[0] === setSub)[2]());
   const tsizes = [["1", L("Standard")], ["1.15", L("Large")], ["1.3", L("Larger")], ["1.5", L("Largest")]];
   const asizes = [["1", L("Standard")], ["1.2", L("Large")], ["1.4", L("Larger")], ["1.7", L("Largest")]];
-  const sw = PALETTES.map(p => `<button class="sw2 ${p.id === S.palette ? "sel" : ""}" data-act="pal" data-id="${p.id}" aria-label="${p.title}"><i style="background:${H(p.c.accent[0])}">${p.id === S.palette ? I.check : ""}</i></button>`).join("");
-  const p = S.place, chk = `<span class="sck">${I.check}</span>`, chev = `<span class="schev">${rtl() ? I.left : I.right}</span>`;
+  const p = S.place, chk = `<span class="sck">${I.check}</span>`, chev = chevB;
   const shortM = n => ({ "Muslim World League": "MWL", "Egyptian General Authority": "Egypt", "Karachi (UIS)": "Karachi", "ISNA (North America)": "ISNA", "Umm al-Qura (Makkah)": "Umm al-Qura" }[n] || n);
   const remind = [[0, L("Off")], ...[5, 10, 15, 20, 30].map(m => [m, m + " " + L("min")])];
-  return `${title("Settings", "الإعدادات")}
-  ${sgroup("theme", `<div class="srow irow"><span class="sic">${SIC.palette}</span><div class="sl"><b>${L("Theme")}</b></div></div>
-    <div class="swatches2">${sw}</div>
-    ${seg("appearance", [["auto", L("Auto")], ["light", L("Light")], ["dark", L("Dark")]], S.appearance)}
-    <div class="srow irow nob"><span class="sic">${SIC.compass}</span><div class="sl">${L("Compass style")}</div></div>
-    ${seg("compass", [["classic", L("Classic")], ["rings", L("Rings")]], S.compass === "rings" ? "rings" : "classic")}<div style="height:12px"></div>`)}
-  ${sgroup("Language & text", `<div class="fsample" dir="rtl">لَا إِلَٰهَ إِلَّا اللَّهُ مُحَمَّدٌ رَسُولُ اللَّهِ</div>` + irow("globe", L("Application language"), sel("lang", LANGS, S.lang)) + irow("font", L("App font"), sel("fontID", FONTS.map(([v, t]) => [v, v === "system" ? (S.lang === "en" ? "System" : L("System default")) : t]), S.fontID))
-    + irow("size", L("Text size"), sel("textSize", tsizes, S.textSize)) + irow("book", L("Azkhar text size"), sel("azkarSize", asizes, S.azkarSize)) + irow("bold", L("Bold text"), tog("bold", S.bold)))}
-  ${sgroup("prayers", irow("loc", L("Current location"), S.gps ? chk : "", esc(S.gps ? p.name : L("Use my location")), 'data-act="gps"')
+  const box = x => `<div class="card sbox">${x}</div>`;
+  if (setSub === "loc") return head + box(irow("loc", L("Current location"), S.gps ? chk : "", esc(S.gps ? p.name : L("Use my location")), 'data-act="gps"')
     + irow("pin", L("Choose a city"), (S.gps ? "" : chk) + chev, S.gps ? "" : esc(p.name), 'data-act="picker"')
-    + hint(irow("clock", L("Local time"), `<b class="muted tnum">${tf(p.tz).format(new Date())} · ${gmt(p.tz)}</b>`), ar() ? `الصلاة والقبلة والمساجد والطقس كلها تعتمد على هذا الموقع. المنطقة الزمنية: ${p.tz}` : F("Prayer times, Qibla, mosques and weather all use this location. Time zone: {0}", p.tz))
-    + irow("fn", L("Method"), sel("method", METHODS.map(m => [m.id, shortM(L(m.name))]), S.method))
-    + irow("pm", L("Adjust times"), `<span class="muted">${L("minutes")}</span>` + chev, "", 'data-act="setOffsets"')
+    + hint(irow("clock", L("Local time"), `<b class="muted tnum">${tf(p.tz).format(new Date())} · ${gmt(p.tz)}</b>`), ar() ? `الصلاة والقبلة والمساجد والطقس كلها تعتمد على هذا الموقع. المنطقة الزمنية: ${p.tz}` : F("Prayer times, Qibla, mosques and weather all use this location. Time zone: {0}", p.tz)))
+    + slab(ar() ? "الحساب" : L("Calculation"))
+    + box(irow("fn", L("Method"), sel("method", METHODS.map(m => [m.id, shortM(L(m.name))]), S.method))
     + irow("sun", L("Hanafi Asr"), tog("hanafi", S.hanafi))
-    + irow("eye", L("Show current prayer (Now)"), tog("showNow", S.showNow !== false)))}
-  ${sgroup("Notifications & reminders", hint(irow("bell", L("Adhan alerts"), tog("notif", S.notif)), ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it."))
+    + irow("pm", L("Adjust times"), `<span class="muted">${L("minutes")}</span>` + chev, "", 'data-act="setOffsets"'));
+  if (setSub === "adhan") return head + box(hint(irow("bell", L("Adhan alerts"), tog("notif", S.notif)), ar() ? "بجانب كل صلاة: زر المنبّه يشغّل الأذان، وزر الجرس يرسل تنبيهًا بدون أذان." : L("Next to each prayer: the alarm button plays the adhan, the bell sends a notification without it."))
     + (S.notif && alertsDenied ? `<div class="snote">${ar() ? "التنبيهات مغلقة لهذا التطبيق في إعدادات الجهاز. فعّلها من إعدادات الهاتف ← التطبيقات ← رحّال ← الإشعارات." : esc(F("Notifications are off for this app in device settings. ")) + esc(L("Turn them on in phone Settings → Apps → Rihal → Notifications."))}</div>` : "")
-    + (NativeWidget ? hint(irow("batt", ar() ? "التنبيهات في وقتها" : L("Alerts on time"), battOK && exactOK ? `<span class="okb">✓ ${ar() ? "مفعّل" : L("On")}</span>` : `<button class="fixb" data-act="fixAlerts">${ar() ? "السماح" : L("Allow")}</button>`),
-        ar() ? "يمنع الهاتف من تأخير الأذان والتذكيرات لتوفير البطارية، فتصل في الدقيقة نفسها." : L("Stops the phone from holding back the adhan and reminders to save battery, so they arrive on the minute.")) : "")
     + irow("speaker", ar() ? "الأذان" : L("Adhan"), `<div class="sndrow">${sel("adhanSound", SOUNDS.map(x => [x[0], sndLabel(x)]), S.adhanSound)}<button class="playb" data-act="playAdhan" data-k="adhanSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("sunrise", ar() ? "أذان الفجر" : L("Fajr adhan"), `<div class="sndrow">${sel("fajrSound", [SOUNDS[0], ...FAJR_SOUNDS, ...SOUNDS.slice(1)].map(x => [x[0], sndLabel(x)]), S.fajrSound)}<button class="playb" data-act="playAdhan" data-k="fajrSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
-    + (NativeWidget || !nativeOK() ? hint(irow("remind", FJ.title(), tog("fajrOn", S.fajrOn && !!S.rugRef)), FJ.hint())
-      + irow("cam", FJ.rug(), `<button class="fixb" data-act="rugShot">${S.rugRef ? FJ.retake() : FJ.take()}</button>`)
-      + irow("lock", FJ.emer(), sel("fajrEmer", [[5, FJ.after(5)], [10, FJ.after(10)], [15, FJ.after(15)], [0, FJ.none()]], S.fajrEmer)) : "")
     + irow("remind", L("Remind me before"), sel("remind", remind, S.remind))
-    + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert))
-    + hint(irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning)), ar() ? "بعد الفجر بـ١٥ دقيقة، ثم كل ساعتين حتى الظهر. يتوقف عند إكمال أذكار الصباح." : L("15 min after Fajr, then every 2 hours until Dhuhr. Stops once you finish the morning azkar."))
+    + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert)))
+    + (NativeWidget ? slab(ar() ? "المزيد" : L("More")) + box(hint(irow("batt", ar() ? "التنبيهات في وقتها" : L("Alerts on time"), battOK && exactOK ? `<span class="okb">✓ ${ar() ? "مفعّل" : L("On")}</span>` : `<button class="fixb" data-act="fixAlerts">${ar() ? "السماح" : L("Allow")}</button>`),
+        ar() ? "يمنع الهاتف من تأخير الأذان والتذكيرات لتوفير البطارية، فتصل في الدقيقة نفسها." : L("Stops the phone from holding back the adhan and reminders to save battery, so they arrive on the minute."))) : "");
+  if (setSub === "fajr") {
+    const st = streakOf(S);
+    return head + box(hint(irow("remind", FJ.title(), tog("fajrOn", S.fajrOn && !!S.rugRef)), FJ.hint())
+      + irow("cam", FJ.rug(), `<button class="fixb" data-act="rugShot">${S.rugRef ? FJ.retake() : FJ.take()}</button>`)
+      + irow("lock", FJ.emer(), sel("fajrEmer", [[5, FJ.after(5)], [10, FJ.after(10)], [15, FJ.after(15)], [0, FJ.none()]], S.fajrEmer)))
+      + `<div class="card sbox fjsum"><div><b>${arN(st.cur)}</b><span>${ar() ? "أيام متتالية" : L("Days in a row")}</span></div><div><b>${arN(st.best)}</b><span>${ar() ? "أفضل سلسلة" : L("Best streak")}</span></div></div>`;
+  }
+  if (setSub === "azkar") return head + box(hint(irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning)), ar() ? "بعد الفجر بـ١٥ دقيقة، ثم كل ساعتين حتى الظهر. يتوقف عند إكمال أذكار الصباح." : L("15 min after Fajr, then every 2 hours until Dhuhr. Stops once you finish the morning azkar."))
     + hint(irow("sunset", ar() ? "تذكير أذكار المساء" : L("Evening azkar reminder"), tog("azEvening", S.azEvening)), ar() ? "بعد العصر بـ١٥ دقيقة، ثم كل ساعتين حتى العشاء. يتوقف عند إكمال أذكار المساء." : L("15 min after Asr, then every 2 hours until Isha. Stops once you finish the evening azkar."))
     + hint(irow("dua", ar() ? "تذكير أذكار بعد الصلاة" : L("After-prayer azkar reminder"), tog("azPrayer", S.azPrayer)), ar() ? "بعد كل صلاة بـ١٥ دقيقة، إذا لم تكمل أذكار بعد الصلاة." : L("15 min after each prayer, if you haven't finished the after-prayer azkar."))
-    + hint(irow("book", ar() ? "تذكير يوم الجمعة" : L("Friday reminder"), tog("azFriday", S.azFriday)), ar() ? "سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Surat al-Kahf 2½ hours before Dhuhr, and the hour of dua 1 hour before Maghrib."))
-    + (NativeWidget ? hint(irow("speaker", ar() ? "العدّ بأزرار الصوت" : L("Count with volume buttons"), tog("volKeys", S.volKeys)), ar() ? "عند فتح قائمة الأذكار، زرّا الصوت يعدّان الذكر التالي." : L("While an azkar list is open, the volume buttons count the next dhikr.")) : ""))}
-  ${sgroup("units", irow("temp", L("Temperature"), sel("temp", [["c", "°C"], ["f", "°F"]], S.temp)))}
-  <div class="card sbox" style="margin-top:22px">${hint(irow("info", L("About"), `<span class="muted">Rihal 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}</span>`), L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities."))}<a class="srow irow" href="${PRIVACY_URL}" target="_blank" rel="noopener"><span class="sic"></span><div class="sl">${PRIVACY_LABEL[S.lang] || "Privacy policy"}</div><span aria-hidden="true">↗</span></a></div>
-`;
+    + hint(irow("book", ar() ? "تذكير يوم الجمعة" : L("Friday reminder"), tog("azFriday", S.azFriday)), ar() ? "سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Surat al-Kahf 2½ hours before Dhuhr, and the hour of dua 1 hour before Maghrib.")))
+    + slab(ar() ? "القراءة" : L("Reading"))
+    + box(irow("size", L("Azkhar text size"), sel("azkarSize", asizes, S.azkarSize))
+    + (NativeWidget ? hint(irow("speaker", ar() ? "العدّ بأزرار الصوت" : L("Count with volume buttons"), tog("volKeys", S.volKeys)), ar() ? "عند فتح قائمة الأذكار، زرّا الصوت يعدّان الذكر التالي." : L("While an azkar list is open, the volume buttons count the next dhikr.")) : ""));
+  if (setSub === "look") {
+    const sw = PALETTES.map(q => `<button class="sw2 ${q.id === S.palette ? "sel" : ""}" data-act="pal" data-id="${q.id}" aria-label="${q.title}"><i style="background:${H(q.c.accent[0])}">${q.id === S.palette ? I.check : ""}</i></button>`).join("");
+    return head + box(`<div class="fsample" dir="rtl">لَا إِلَٰهَ إِلَّا اللَّهُ مُحَمَّدٌ رَسُولُ اللَّهِ</div>` + irow("globe", L("Application language"), sel("lang", LANGS, S.lang))
+      + irow("size", L("Text size"), sel("textSize", tsizes, S.textSize)) + irow("bold", L("Bold text"), tog("bold", S.bold)))
+      + slab(ar() ? "الألوان" : L("Colours")) + `<div class="card sbox spad"><div class="swatches2">${sw}</div>${seg("appearance", [["auto", L("Auto")], ["light", L("Light")], ["dark", L("Dark")]], S.appearance)}<div style="height:10px"></div></div>`
+      + slab(ar() ? "المزيد" : L("More"))
+      + box(irow("font", L("App font"), sel("fontID", FONTS.map(([v, t]) => [v, v === "system" ? (S.lang === "en" ? "System" : L("System default")) : t]), S.fontID))
+      + irow("eye", L("Show current prayer (Now)"), tog("showNow", S.showNow !== false))
+      + irow("compass", L("Compass style"), sel("compass", [["classic", L("Classic")], ["rings", L("Rings")]], S.compass === "rings" ? "rings" : "classic"))
+      + irow("temp", L("Temperature"), sel("temp", [["c", "°C"], ["f", "°F"]], S.temp)));
+  }
+  return head + `<div class="card sbox">${irow("info", ar() ? "الإصدار" : L("Version"), `<span class="muted">Rihal 1.0${__BUILD__ ? ` (${__BUILD__})` : ""}</span>`)}<a class="srow irow" href="${PRIVACY_URL}" target="_blank" rel="noopener"><span class="sic"></span><div class="sl">${PRIVACY_LABEL[S.lang] || "Privacy policy"}</div><span aria-hidden="true">↗</span></a></div>
+  <div class="sfoot" style="margin:12px 8px">${L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities.")}</div>`;
 }
 
 /* ----- place picker sheet ----- */
@@ -868,7 +908,7 @@ function goBack() {
   if (tasbihId) { closeTasbih(); return; }
   if (pickerOpen || dirTarget) { pickerOpen = null; dirTarget = null; renderSheet(); return; }
   if (S.tab === 3) return;
-  if (setSub) { setSub = null; render(); return; }
+  if (setSub) { ACT.setBack(); return; }
   if (azkarCat != null) { ACT.back(); return; }
   if (tabHist.length) { S.tab = tabHist.pop(); setSub = null; save(); render(); $("#view").scrollTop = 0; return; }
   if (S.tab !== 0) { S.tab = 0; save(); render(); return; }
@@ -1053,7 +1093,8 @@ const ACT = {
   pal(el) { S.palette = el.dataset.id; save(); render(); },
   seg(el) { S[el.dataset.k] = el.dataset.v; save(); render(); },
   setOffsets() { setSub = "offsets"; render(); $("#view").scrollTop = 0; },
-  setBack() { setSub = null; render(); },
+  setBack() { setSub = setSub === "offsets" ? "loc" : null; render(); $("#view").scrollTop = 0; },
+  setGo(el) { setSub = el.dataset.s; render(); $("#view").scrollTop = 0; },
   resetOff() { S.off = {}; save(); scheduleAlerts(); render(); },
   playAdhan(el) { playAdhan(S[el.dataset.k]); },
   askExact() { askExact(); },

@@ -1246,14 +1246,14 @@ function paintFajr() {
     tickEmer(); clearInterval(fajrHoldT); fajrHoldT = setInterval(tickEmer, 1000);
   } else if (fajrUI === "camera" || fajrUI === "setup") {
     const setup = fajrUI === "setup";
-    o.innerHTML = `<div class="fjcm"><video id="fjv" playsinline muted autoplay></video><div class="fjframe"></div>
+    o.innerHTML = `<div class="fjcm"><video id="fjv" playsinline muted autoplay poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video><div class="fjframe"></div>
       <button class="fjflash" data-act="fjTorch" aria-label="flash">${FI.flash}</button>
       <button class="fjclose" data-act="fjCamClose" aria-label="close">${FI.x}</button>
       <div class="fjtop">${setup ? (ar() ? "صوّر سجادة صلاتك داخل الإطار" : L("Photograph your prayer rug inside the frame")) : (ar() ? "ضع السجادة داخل الإطار" : L("Fit the rug inside the frame"))}
         <small>${setup ? (ar() ? "ستُقارن بها كل صباح، وتبقى على هاتفك فقط" : L("It's compared every morning and stays on your phone")) : (ar() ? "الفلاش يعمل تلقائيًا في الظلام" : L("The flash turns on by itself in the dark"))}</small></div>
       <div class="fjbad ${fajrMsg ? "on" : ""}">${esc(fajrMsg)}</div>
       <button class="fjshut" data-act="fjShoot" aria-label="photo"><i></i></button></div>`;
-    const v = $("#fjv"); if (v && fajrCam) { v.srcObject = fajrCam; v.play().catch(() => {}); }
+    const v = $("#fjv"); if (v) { v.onplaying = () => v.classList.add("live"); if (fajrCam) { v.srcObject = fajrCam; v.play().catch(() => {}); } }
   } else if (fajrUI === "done") {
     const st = streakOf(S), r = fajrResult || {};
     const keys = []; const d0 = new Date(fajrSince || Date.now());
@@ -1298,7 +1298,7 @@ async function startCam() {
   stopCam();
   try {
     fajrCam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false });
-    const v = $("#fjv"); if (v) { v.srcObject = fajrCam; await v.play().catch(() => {}); }
+    const v = $("#fjv"); if (v) { v.onplaying = () => v.classList.add("live"); v.srcObject = fajrCam; await v.play().catch(() => {}); }
     // in the dark, turn the flash on by itself
     setTimeout(() => { const v2 = $("#fjv"); if (!v2 || !fajrCam) return; try { if (rugFeatures(v2).lum < 45) setTorch(true); } catch (e) {} }, 1200);
   } catch (e) {

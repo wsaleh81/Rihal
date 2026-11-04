@@ -6,6 +6,7 @@ import DATA from "./data.json";
 import AR from "./ar.json";
 import MORE from "./azkar_more.json";
 import { classicSVG, ringsSVG, updateDial as dialUpdate, sunLayerSVG } from "./dials.js";
+import { rugFeatures, rugScore, RUG_MATCH, dayKey, streakOf, markDay } from "./fajr.js";
 import { mushafHTML, mushafAfter, mushafIndexToggle, mushafSetPage, mushafBy, SURAS } from "./mushaf.js";
 import { Qibla, haversine, diff, norm, cardinal, sunInfo, METHODS, PRAYERS, prayerEvents, dayFor } from "./core.js";
 
@@ -24,7 +25,7 @@ const PALETTES = [
 /* ---------- settings store ---------- */
 const DEF = {
   lang: "ar", palette: "ocean", appearance: "auto", textSize: "1", bold: false, azkarSize: "1",
-  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: true, azEvening: true, azPrayer: false, azFriday: true, volKeys: true, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
+  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: true, azEvening: true, azPrayer: false, azFriday: true, volKeys: true, fajrOn: false, fajrEmer: 10, rugRef: null, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
   temp: "c", tab: 0, welcomed: false, compass: "classic", alarm: {}, fontID: "system", v: 2,
   place: { name: "Kuwait City", country: "Kuwait", lat: 29.3759, lon: 47.9774, tz: "Asia/Kuwait", iso: "KW" },
   gps: false,
@@ -264,6 +265,7 @@ let gpsState = "idle", gpsAcc = null;
 const nativeOK = () => Capacitor.isNativePlatform();
 async function scheduleAlerts() {
   if (!nativeOK()) return;
+  pushFajr();
   try {
     const pending = await LocalNotifications.getPending();
     if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications });
@@ -724,6 +726,8 @@ const SIC = {
   remind: PI.alarm, sunrise: PI.sunrise, sunset: SI('<path d="M19.5 14.5A7.5 7.5 0 1 1 9.5 4.5a6 6 0 0 0 10 10z"/>'),
   dua: SI('<circle cx="12" cy="4.5" r="1.8"/><circle cx="17" cy="7" r="1.8"/><circle cx="18.2" cy="12.5" r="1.8"/><circle cx="7" cy="7" r="1.8"/><circle cx="5.8" cy="12.5" r="1.8"/><circle cx="12" cy="16" r="1.8"/><path d="M12 17.8V21"/>'), temp: SI('<path d="M10 14.2V5a2 2 0 0 1 4 0v9.2a4 4 0 1 1-4 0z"/><path d="M12 11v5"/>'),
   info: SI('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.6v.2"/>'),
+  cam: SI('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  lock: SI('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>'),
   play: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M10 8l6 4-6 4z" fill="var(--card)"/></svg>',
 };
 const irow = (ic, label, ctl, sub, act) => `<${act ? `button class="srow irow lbtn" ${act}` : 'div class="srow irow"'}><span class="sic">${SIC[ic] || ""}</span><div class="sl">${label}${sub ? `<small>${sub}</small>` : ""}</div>${ctl || ""}</${act ? "button" : "div"}>`;
@@ -787,6 +791,9 @@ function viewSettings() {
         ar() ? "يمنع الهاتف من تأخير الأذان والتذكيرات لتوفير البطارية، فتصل في الدقيقة نفسها." : L("Stops the phone from holding back the adhan and reminders to save battery, so they arrive on the minute.")) : "")
     + irow("speaker", ar() ? "الأذان" : L("Adhan"), `<div class="sndrow">${sel("adhanSound", SOUNDS.map(x => [x[0], sndLabel(x)]), S.adhanSound)}<button class="playb" data-act="playAdhan" data-k="adhanSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
     + irow("sunrise", ar() ? "أذان الفجر" : L("Fajr adhan"), `<div class="sndrow">${sel("fajrSound", [SOUNDS[0], ...FAJR_SOUNDS, ...SOUNDS.slice(1)].map(x => [x[0], sndLabel(x)]), S.fajrSound)}<button class="playb" data-act="playAdhan" data-k="fajrSound" aria-label="${ar() ? "استماع" : "Play"}">${SIC.play}</button></div>`)
+    + (NativeWidget || !nativeOK() ? hint(irow("remind", FJ.title(), tog("fajrOn", S.fajrOn && !!S.rugRef)), FJ.hint())
+      + irow("cam", FJ.rug(), `<button class="fixb" data-act="rugShot">${S.rugRef ? FJ.retake() : FJ.take()}</button>`)
+      + irow("lock", FJ.emer(), sel("fajrEmer", [[5, FJ.after(5)], [10, FJ.after(10)], [15, FJ.after(15)], [0, FJ.none()]], S.fajrEmer)) : "")
     + irow("remind", L("Remind me before"), sel("remind", remind, S.remind))
     + irow("sunrise", L("Sunrise alert"), tog("sunriseAlert", S.sunriseAlert))
     + hint(irow("sunrise", ar() ? "تذكير أذكار الصباح" : L("Morning azkar reminder"), tog("azMorning", S.azMorning)), ar() ? "بعد الفجر بـ١٥ دقيقة، ثم كل ساعتين حتى الظهر. يتوقف عند إكمال أذكار الصباح." : L("15 min after Fajr, then every 2 hours until Dhuhr. Stops once you finish the morning azkar."))
@@ -854,6 +861,8 @@ function render() {
 /* ----- Back (Android button or swipe): previous page inside the app; never on the Mushaf, where swipes turn pages ----- */
 let tabHist = [], lastBack = 0;
 function goBack() {
+  if (fajrUI === "alarm") return;                                  // the Fajr alarm can't be swiped away
+  if (fajrUI) { ACT[fajrUI === "done" ? "fjClose" : "fjCamClose"](); return; }
   const cb = $("#cbox.on"); if (cb) { cb.classList.remove("on"); return; }
   if (tasbihId) { closeTasbih(); return; }
   if (pickerOpen || dirTarget) { pickerOpen = null; dirTarget = null; renderSheet(); return; }
@@ -1105,4 +1114,213 @@ function boot() {
   }
   if ("serviceWorker" in navigator && !nativeOK() && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+/* ---------- Fajr rug alarm (screens; the ringing itself is native) ---------- */
+const FJ = {
+  title: () => ar() ? "منبّه الفجر" : L("Fajr alarm"),
+  hint: () => ar() ? "عند الفجر يرنّ الأذان ولا يتوقف حتى تصوّر سجادة صلاتك، ويعدّ الأيام التي تصلي فيها الفجر متتالية." : L("At Fajr the adhan rings and won't stop until you photograph your prayer rug. It also counts the days you pray Fajr in a row."),
+  rug: () => ar() ? "تصوير السجادة" : L("Prayer rug photo"),
+  take: () => ar() ? "التقاط صورة" : L("Take photo"),
+  retake: () => ar() ? "إعادة التصوير" : L("Retake"),
+  emer: () => ar() ? "الإيقاف الطارئ" : L("Emergency stop"),
+  after: n => ar() ? `بعد ${String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d])} دقائق` : F("After {0} min", n),
+  none: () => ar() ? "بدون" : L("None"),
+};
+let fajrUI = null;          // null | "alarm" | "camera" | "setup" | "done"
+let fajrSince = 0, fajrCam = null, fajrMsg = "", fajrResult = null, fajrHoldT = null;
+const fajrTz = () => S.place.tz;
+function nextFajrs(n = 7) {
+  const p = S.place, now = Date.now();
+  return prayerEvents(now, p.lat, p.lon, p.tz, method(), S.hanafi, offs(), 10).all.filter(e => e.prayer === "fajr" && e.date > now).slice(0, n).map(e => e.date);
+}
+function sunriseAfter(t) {
+  const p = S.place, e = prayerEvents(t, p.lat, p.lon, p.tz, method(), S.hanafi, offs(), 1).all.find(x => x.prayer === "sunrise" && x.date > t);
+  return e ? e.date : t + 90 * 60000;
+}
+/** Sends the next Fajr times to Android, which sets them as real alarms. */
+function pushFajr() {
+  if (!NativeWidget) return;
+  const sound = S.fajrSound === "adhan" ? "adhan" : S.fajrSound;
+  NativeWidget.setFajrAlarm({ on: !!(S.fajrOn && S.rugRef), times: nextFajrs().join(","), sound, max: 60 }).catch(() => {});
+}
+/** On start and on return: is it ringing? Which past alarms got no rug photo (streak back to 0)? */
+async function fajrSync() {
+  if (!NativeWidget) return;
+  let st; try { st = await NativeWidget.fajrState(); } catch (e) { return; }
+  const now = Date.now(), days = streakOf(S).days;
+  for (const s of String(st.rang || "").split(",")) {
+    const t = +s; if (!t) continue;
+    const k = dayKey(t, fajrTz());
+    if (!days[k] && !(st.ringing && now - t < 3 * 3600000) && now > sunriseAfter(t)) markDay(S, k, "miss");
+  }
+  save();
+  if (st.ringing) { fajrSince = st.since || now; if (!fajrUI || fajrUI === "done") showFajr("alarm"); }
+  else if (fajrUI === "alarm" || fajrUI === "camera") hideFajr();
+}
+function fajrStop() { if (NativeWidget) NativeWidget.stopFajrAlarm().catch(() => {}); }
+const todayFajrKey = () => dayKey(fajrSince || Date.now(), fajrTz());
+
+function showFajr(mode) {
+  fajrUI = mode; fajrMsg = "";
+  let o = $("#fajr"); if (!o) { o = document.createElement("div"); o.id = "fajr"; document.body.appendChild(o); }
+  o.className = "on " + mode;
+  if (mode === "camera" || mode === "setup") startCam(); else stopCam();
+  paintFajr();
+}
+function hideFajr() { fajrUI = null; stopCam(); clearInterval(fajrHoldT); const o = $("#fajr"); if (o) o.className = ""; }
+const FI = {
+  moon: SI('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
+  spk: SI('<path d="M4 9.5h3l5-4v13l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>'),
+  cam: SI('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  lock: SI('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'),
+  open: SI('<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>'),
+  flash: SI('<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>'),
+  chk: SI('<path d="M5 12.5 10 17 19 7.5"/>'),
+  x: SI('<path d="M6 6l12 12M18 6 6 18"/>'),
+};
+const arN = n => ar() ? String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]) : String(n);
+function paintFajr() {
+  const o = $("#fajr"); if (!o || !fajrUI) return;
+  const p = S.place;
+  if (fajrUI === "alarm") {
+    const t = fmtT(fajrSince || Date.now()), emer = +S.fajrEmer;
+    o.innerHTML = `<div class="fjal">
+      <div class="fjmoon">${FI.moon}</div><div class="fjname">${ar() ? "صلاة الفجر" : esc(pName("fajr"))}</div><div class="fjtime">${t}</div>
+      <div class="fjq">${ar() ? "الصلاة خير من النوم" : L("Prayer is better than sleep")}</div>
+      <div class="fjring"><div>${FI.spk}</div></div>
+      <button class="fjcam" data-act="fjCam">${FI.cam}<span>${ar() ? "صوّر السجادة" : L("Photograph the rug")}</span></button>
+      <button class="fjskip" data-act="fjSkip">${ar() ? "لا أصلي اليوم" : L("Not praying today")}</button>
+      ${emer ? `<button class="fjemer" id="fjemer"><span class="fjhold"></span><span class="fjic"></span><span class="fjtx"></span></button>` : ""}
+    </div>`;
+    tickEmer(); clearInterval(fajrHoldT); fajrHoldT = setInterval(tickEmer, 1000);
+  } else if (fajrUI === "camera" || fajrUI === "setup") {
+    const setup = fajrUI === "setup";
+    o.innerHTML = `<div class="fjcm"><video id="fjv" playsinline muted autoplay></video><div class="fjframe"></div>
+      <button class="fjflash" data-act="fjTorch" aria-label="flash">${FI.flash}</button>
+      <button class="fjclose" data-act="fjCamClose" aria-label="close">${FI.x}</button>
+      <div class="fjtop">${setup ? (ar() ? "صوّر سجادة صلاتك داخل الإطار" : L("Photograph your prayer rug inside the frame")) : (ar() ? "ضع السجادة داخل الإطار" : L("Fit the rug inside the frame"))}
+        <small>${setup ? (ar() ? "ستُقارن بها كل صباح، وتبقى على هاتفك فقط" : L("It's compared every morning and stays on your phone")) : (ar() ? "الفلاش يعمل تلقائيًا في الظلام" : L("The flash turns on by itself in the dark"))}</small></div>
+      <div class="fjbad ${fajrMsg ? "on" : ""}">${esc(fajrMsg)}</div>
+      <button class="fjshut" data-act="fjShoot" aria-label="photo"><i></i></button></div>`;
+    const v = $("#fjv"); if (v && fajrCam) { v.srcObject = fajrCam; v.play().catch(() => {}); }
+  } else if (fajrUI === "done") {
+    const st = streakOf(S), r = fajrResult || {};
+    const keys = []; const d0 = new Date(fajrSince || Date.now());
+    for (let i = 6; i >= 0; i--) keys.push(dayKey(+d0 - i * 86400000, p.tz));
+    const dots = keys.map((k, i) => { const v = st.days[k]; return `<i class="${v === "ok" ? "ok" : v === "skip" ? "sk" : v === "miss" ? "ms" : "no"}${i === 6 ? " t" : ""}">${v === "ok" ? "✓" : v === "skip" ? "–" : ""}</i>`; }).join("");
+    o.innerHTML = `<div class="fjok">
+      <div class="fjchk">${FI.chk}</div><div class="fjtq">${ar() ? "تقبّل الله" : L("May Allah accept it")}</div>
+      <div class="fjst">${r.late ? `<div class="fjnew">${ar() ? "بعد الشروق، بدأت سلسلة جديدة" : L("After sunrise: a new streak begins")}</div>` : ""}
+        <div class="fjn">${arN(st.cur)}</div><div class="fjd">${ar() ? "يومًا متتاليًا في صلاة الفجر" : L("days in a row praying Fajr")}</div>
+        <div class="fjdots">${dots}</div>
+        <div class="fjbest">${ar() ? `أفضل سلسلة: ${arN(st.best)} يومًا` : F("Best streak: {0} days", st.best)}</div></div>
+      <div class="fjdoa">«مَن صلَّى الصُّبحَ فهو في ذمَّةِ اللهِ»</div>
+      <button class="fjgo" data-act="fjAzkar">${ar() ? "أذكار الصباح" : L("Morning azkar")}</button>
+      <button class="fjskip dark" data-act="fjClose">${ar() ? "إغلاق" : L("Close")}</button>
+    </div>`;
+  }
+}
+const fmtT = t => new Intl.DateTimeFormat("en-GB", { timeZone: S.place.tz, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t));
+/** Emergency stop: locked for the chosen minutes, then press and hold 5 seconds. */
+function tickEmer() {
+  const b = $("#fjemer"); if (!b) return;
+  const left = (fajrSince || Date.now()) + (+S.fajrEmer) * 60000 - Date.now();
+  const tx = b.querySelector(".fjtx"), ic = b.querySelector(".fjic");
+  if (left > 0) {
+    const m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60, mm = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    b.classList.remove("open"); ic.innerHTML = FI.lock;
+    tx.textContent = ar() ? `إيقاف طارئ · بعد ${mm}` : F("Emergency stop in {0}", mm);
+  } else if (!b.classList.contains("open")) {
+    b.classList.add("open"); ic.innerHTML = FI.open;
+    tx.textContent = ar() ? "إيقاف طارئ · اضغط مطوّلًا ٥ ثوانٍ" : L("Emergency stop · hold 5 seconds");
+    let ht = null;
+    const up = () => { clearTimeout(ht); b.classList.remove("holding"); };
+    b.onpointerdown = e => { e.preventDefault(); b.classList.add("holding"); ht = setTimeout(() => { up(); fajrEmergency(); }, 5000); };
+    b.onpointerup = b.onpointerleave = b.onpointercancel = up;
+  }
+}
+function fajrEmergency() {
+  markDay(S, todayFajrKey(), "miss"); save(); fajrStop(); hideFajr();
+  toast(ar() ? "لم تُصوَّر السجادة اليوم" : L("No rug photo today"));
+}
+async function startCam() {
+  stopCam();
+  try {
+    fajrCam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false });
+    const v = $("#fjv"); if (v) { v.srcObject = fajrCam; await v.play().catch(() => {}); }
+    // in the dark, turn the flash on by itself
+    setTimeout(() => { const v2 = $("#fjv"); if (!v2 || !fajrCam) return; try { if (rugFeatures(v2).lum < 45) setTorch(true); } catch (e) {} }, 1200);
+  } catch (e) {
+    fajrMsg = ar() ? "تعذّر فتح الكاميرا. اسمح لرحّال باستخدام الكاميرا من إعدادات الهاتف." : L("Can't open the camera. Allow Rihal to use the camera in phone settings.");
+    paintFajr();
+  }
+}
+let torchOn = false;
+function setTorch(on) {
+  const tr = fajrCam && fajrCam.getVideoTracks()[0]; if (!tr) return;
+  torchOn = on; tr.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+  const f = $(".fjflash"); if (f) f.classList.toggle("on", on);
+}
+function stopCam() { if (fajrCam) { fajrCam.getTracks().forEach(t => t.stop()); fajrCam = null; } torchOn = false; }
+function fajrShoot() {
+  const v = $("#fjv"); if (!v || !v.videoWidth) return;
+  const f = rugFeatures(v);
+  if (f.lum < 18 || !f.ok) { fajrMsg = ar() ? "المكان مظلم، شغّل الفلاش" : L("Too dark. Turn on the flash"); vibr(80); paintFajr(); return; }
+  if (fajrUI === "setup") {
+    S.rugRef = f; S.fajrOn = true; save(); hideFajr(); pushFajr(); render();
+    toast(ar() ? "تم حفظ صورة السجادة" : L("Rug photo saved")); return;
+  }
+  const score = rugScore(S.rugRef, f);
+  if (score < RUG_MATCH) { fajrMsg = ar() ? "هذه ليست سجادتك، حاول مرة أخرى" : L("That's not your rug. Try again"); vibr([60, 60, 60]); paintFajr(); return; }
+  const t = fajrSince || Date.now(), late = Date.now() > sunriseAfter(t - 60000);
+  markDay(S, dayKey(t, fajrTz()), late ? "miss" : "ok"); save();
+  fajrResult = { late }; fajrStop(); vibr(120); showFajr("done");
+}
+/** Turning the alarm on: rug photo first, then the Android permissions it needs. */
+async function fajrEnable(on) {
+  if (!on) { S.fajrOn = false; save(); pushFajr(); render(); return; }
+  if (NativeWidget) {
+    try {
+      const p = await NativeWidget.fajrPermissions();
+      if (!p.fullScreen || !p.exact) {
+        confirmBox(ar() ? "اسمح لرحّال بعرض المنبّه فوق شاشة القفل وفي وقته تمامًا، ثم ارجع وفعّل المنبّه." : L("Allow Rihal to show the alarm over the lock screen and exactly on time, then come back and turn the alarm on."),
+          () => NativeWidget.openFajrPermission({ which: p.fullScreen ? "exact" : "fullScreen" }),
+          { title: ar() ? "لكي يظهر المنبّه فوق شاشة القفل" : L("So the alarm can show over the lock screen"), yes: ar() ? "متابعة" : L("Continue"), no: ar() ? "لاحقًا" : L("Later"), good: true });
+        render(); return;
+      }
+    } catch (e) {}
+  }
+  if (!S.rugRef) { showFajr("setup"); render(); return; }
+  S.fajrOn = true; save(); pushFajr(); render();
+}
+Object.assign(ACT, {
+  fjCam() { showFajr("camera"); },
+  fjCamClose() { if (fajrUI === "setup") { hideFajr(); render(); } else showFajr("alarm"); },
+  fjShoot() { fajrShoot(); },
+  fjTorch() { setTorch(!torchOn); },
+  fjSkip() {
+    if (fajrUI === "done") return;
+    markDay(S, todayFajrKey(), "skip"); save(); fajrStop(); hideFajr();
+    toast(ar() ? "تقبّل الله منك، السلسلة محفوظة" : L("Your streak is kept"));
+  },
+  fjAzkar() { hideFajr(); setSub = null; S.tab = 2; azkarCat = 0; save(); render(); $("#view").scrollTop = 0; },
+  fjClose() { hideFajr(); },
+  rugShot() { showFajr("setup"); },
+});
+document.addEventListener("change", e => {
+  const k = e.target && e.target.dataset && e.target.dataset.k;
+  if (k === "fajrOn") { e.stopImmediatePropagation(); fajrEnable(e.target.checked); }
+  if (k === "fajrEmer") { S.fajrEmer = +e.target.value; save(); }
+}, true);
+if (NativeWidget) {
+  NativeWidget.addListener("fajrAlarm", o => { if (o && o.ringing) fajrSync(); else if (fajrUI === "alarm" || fajrUI === "camera") { hideFajr(); fajrSync(); } });
+  NativeWidget.getLaunchTab().then(o => { if (o && o.fajr) fajrSync(); }).catch(() => {});
+  fajrSync(); pushFajr();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) fajrSync(); });
+}
+// Browser preview: ?fajr=alarm|camera|done shows a screen with sample data.
+try {
+  const q = new URLSearchParams(location.search).get("fajr");
+  if (q && !nativeOK()) { fajrSince = Date.now() - 18000; S.fajrEmer = S.fajrEmer ?? 10; if (q === "done") { const st = streakOf(S); if (!st.cur) { st.cur = 13; st.best = 30; } } showFajr(q); }
+} catch (e) {}
 boot();

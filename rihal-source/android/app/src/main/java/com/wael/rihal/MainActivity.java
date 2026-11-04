@@ -1,9 +1,13 @@
 package com.wael.rihal;
 
+import android.app.Activity;
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.KeyEvent;
+import android.view.WindowManager;
 import android.webkit.WebView;
 
 import androidx.activity.EdgeToEdge;
@@ -28,6 +32,7 @@ public class MainActivity extends BridgeActivity {
         // enabling it earlier created the window with the splash theme (a "Rihal" title bar with the splash picture).
         EdgeToEdge.enable(this);
         // Back (button or swipe) goes to the previous page inside the app instead of closing it; the page decides.
+        alarmMode(this, isAlarm(getIntent()));
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -35,6 +40,29 @@ public class MainActivity extends BridgeActivity {
                 moveTaskToBack(true);
             }
         });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (isAlarm(intent)) alarmMode(this, true);
+    }
+
+    private static boolean isAlarm(Intent i) {
+        return i != null && i.getBooleanExtra(FajrAlarm.EXTRA, false) && FajrAlarmService.ringing;
+    }
+
+    /** Fajr alarm: show over the lock screen, turn the screen on and keep it on; undone when the alarm stops. */
+    static void alarmMode(Activity a, boolean on) {
+        if (Build.VERSION.SDK_INT >= 27) {
+            a.setShowWhenLocked(on);
+            a.setTurnScreenOn(on);
+        } else {
+            int f = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+            if (on) a.getWindow().addFlags(f); else a.getWindow().clearFlags(f);
+        }
+        if (on) a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else a.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     @Override
@@ -59,7 +87,7 @@ public class MainActivity extends BridgeActivity {
             w.pauseTimers();
         }
         idle.removeCallbacks(closeApp);
-        idle.postDelayed(closeApp, IDLE_CLOSE_MS);
+        if (!FajrAlarmService.ringing) idle.postDelayed(closeApp, IDLE_CLOSE_MS);
     }
 
     @Override
@@ -72,6 +100,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        // While the Fajr alarm rings, the volume keys cannot silence it.
+        if (FajrAlarmService.ringing && (k == KeyEvent.KEYCODE_VOLUME_UP || k == KeyEvent.KEYCODE_VOLUME_DOWN)) return true;
         if (RihalWidgetPlugin.volumeKeys && RihalWidgetPlugin.instance != null
                 && (k == KeyEvent.KEYCODE_VOLUME_UP || k == KeyEvent.KEYCODE_VOLUME_DOWN)) {
             if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) RihalWidgetPlugin.instance.volumePressed();

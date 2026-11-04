@@ -26,18 +26,27 @@ const PALETTES = [
 /* ---------- settings store ---------- */
 const DEF = {
   lang: "ar", palette: "ocean", appearance: "auto", textSize: "1", bold: false, azkarSize: "1",
-  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: true, azEvening: true, azPrayer: false, azFriday: true, volKeys: true, fajrOn: false, fajrEmer: 10, rugRef: null, off: {}, notif: true, remind: 0, sunriseAlert: false, muted: {},
-  temp: "c", tab: 0, welcomed: false, compass: "classic", alarm: {}, fontID: "system", v: 2,
+  method: "kuwait", hanafi: false, showNow: true, adhanSound: "adhan", fajrSound: "adhan", azMorning: false, azEvening: false, azPrayer: false, azFriday: false, volKeys: true, fajrOn: false, fajrEmer: 10, rugRef: null, off: {}, notif: false, remind: 0, sunriseAlert: false, muted: {},
+  temp: "c", tab: 0, welcomed: false, compass: "rings", alarm: {}, fontID: "system", v: 2,
   place: { name: "Kuwait City", country: "Kuwait", lat: 29.3759, lon: 47.9774, tz: "Asia/Kuwait", iso: "KW" },
   gps: false,
 };
 let S = { ...DEF };
-try { Object.assign(S, JSON.parse(localStorage.getItem("rihal") || "{}")); } catch (e) {}
+// A new install starts with the ring compass and every alert off. After an update the user's own settings stay as
+// they were; a setting saved before it existed keeps the old default (alerts and azkar reminders on, classic compass).
+let stored = null;
+try { stored = JSON.parse(localStorage.getItem("rihal") || "null"); } catch (e) {}
+const freshInstall = !stored;
+if (stored) {
+  const OLD = { notif: true, compass: "classic", azMorning: true, azEvening: true, azFriday: true };
+  for (const k in OLD) if (stored[k] === undefined) stored[k] = OLD[k];
+  Object.assign(S, stored);
+}
 delete S.preview;
 function safeTz(tz) { try { new Intl.DateTimeFormat("en", { timeZone: tz }); return tz; } catch (e) { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } }
 if (S.place) S.place.tz = safeTz(S.place.tz);
 if (S.v !== 2) { S.tab = 0; S.v = 2; S.alarm = S.alarm || {}; }
-if (!S.nv) { S.notif = true; S.nv = 1; }   // adhan alerts are on by default, as on iPhone
+if (!S.nv) { if (!freshInstall) S.notif = true; S.nv = 1; }
 S.tab = 0; // the app always opens on Prayer Times (a widget tap can still open Mosques)
 const save = () => { try { localStorage.setItem("rihal", JSON.stringify(S)); } catch (e) {} };
 const ar = () => S.lang === "ar";

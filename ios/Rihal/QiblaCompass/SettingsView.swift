@@ -8,7 +8,7 @@ struct SettingsView: View {
     @State private var notifDenied = false
     @State private var openHint: String? = nil
     @AppStorage("tempUnit") private var tempUnit = "c"
-    @AppStorage("compassStyle") private var compassStyle = "classic"
+    @AppStorage("compassStyle") private var compassStyle = "rings"
 
     var body: some View {
         NavigationStack {

@@ -4,7 +4,7 @@ import UIKit
 struct QiblaView: View {
     /// true when shown inside the combined home page (no own scroll view, title or source line)
     var embedded = false
-    @AppStorage("compassStyle") private var compassStyle = "classic"
+    @AppStorage("compassStyle") private var compassStyle = "rings"
     @EnvironmentObject var model: AppModel
     @State private var shown: Double = 0
     @State private var wasAligned = false

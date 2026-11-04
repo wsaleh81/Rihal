@@ -21,15 +21,15 @@ final class AppModel: ObservableObject {
     @AppStorage("fontID") var fontID = "system"
     @AppStorage("lastGPSJSON") var lastGPSJSON = ""
     @AppStorage("pinnedJSON") var pinnedJSON = ""
-    @AppStorage("notifOn") var notifOn = true
+    @AppStorage("notifOn") var notifOn = false
     @AppStorage("notifBefore") var notifBefore = 0
     @AppStorage("notifSunrise") var notifSunrise = false
     @AppStorage("adhanSound") var adhanSound = "adhan"
     @AppStorage("fajrSound") var fajrSound = "adhan"
-    @AppStorage("azMorning") var azMorning = true
-    @AppStorage("azEvening") var azEvening = true
+    @AppStorage("azMorning") var azMorning = false
+    @AppStorage("azEvening") var azEvening = false
     @AppStorage("azPrayer") var azPrayer = false
-    @AppStorage("azFriday") var azFriday = true
+    @AppStorage("azFriday") var azFriday = false
 
     @Published var tab = 0
     /// when the app went to the background; after 5 minutes away it opens on Prayer Times again
@@ -43,7 +43,17 @@ final class AppModel: ObservableObject {
     private var bag = Set<AnyCancellable>()
 
     init() {
-        UserDefaults.standard.register(defaults: ["usingGPS": true, "notifOn": true])
+        // A new install starts with the ring compass and every alert off. Someone updating keeps what they had:
+        // a setting they never changed keeps the old default (alerts and azkar reminders on, classic compass).
+        let d = UserDefaults.standard
+        if d.object(forKey: "defaultsV2") == nil {
+            if d.bool(forKey: "welcomed") {
+                for k in ["notifOn", "azMorning", "azEvening", "azFriday"] where d.object(forKey: k) == nil { d.set(true, forKey: k) }
+                if d.object(forKey: "compassStyle") == nil { d.set("classic", forKey: "compassStyle") }
+            }
+            d.set(true, forKey: "defaultsV2")
+        }
+        UserDefaults.standard.register(defaults: ["usingGPS": true])
         network.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { self?.objectWillChange.send(); if self?.network.online == true { self?.refreshWeather() } }
         }.store(in: &bag)

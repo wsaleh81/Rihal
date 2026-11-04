@@ -49,43 +49,40 @@ enum MoreAzkar {
     }
 }
 
-/// Icon of a section: an emoji, or the prayer rug drawn in burgundy and gold.
+/// Icon of a section: a one-colour line symbol in the app's colour (same look as the Android app).
 struct MoreAzkarIcon: View {
     let icon: String
     let size: CGFloat
+    static let symbols: [String: String] = [
+        "📖": "book", "🌾": "leaf", "🛏️": "bed.double", "💧": "drop", "🏠": "house", "📢": "megaphone",
+        "🧭": "safari", "🌌": "moon", "🫶": "heart.circle", "🍽️": "fork.knife", "🌙": "moon.stars", "👕": "tshirt",
+        "🚪": "door.left.hand.open", "🌧️": "cloud.rain", "🩺": "stethoscope", "🤍": "heart", "🧳": "suitcase.rolling",
+        "🕋": "cube", "🤲": "arrow.counterclockwise", "📿": "circle.dotted", "✨": "sparkles", "👶": "figure.and.child.holdinghands",
+        "🛡️": "checkmark.shield", "📚": "books.vertical"
+    ]
     var body: some View {
-        if icon == "svg:rug" { PrayerRugIcon().frame(width: size * 1.15, height: size * 1.15) }
+        if icon == "svg:rug" { PrayerRugIcon().frame(width: size * 1.1, height: size * 1.1).foregroundStyle(Theme.mintDeep) }
+        else if icon == "🕌" { Image("MosqueIcon").renderingMode(.template).resizable().scaledToFit().frame(width: size, height: size).foregroundStyle(Theme.mintDeep) }
+        else if let sym = Self.symbols[icon] { Image(systemName: sym).font(.system(size: size * 0.85, weight: .regular)).foregroundStyle(Theme.mintDeep) }
         else { Text(icon).font(.system(size: size)) }
     }
 }
 
-/// Prayer rug with a mihrab arch (same drawing as the Android app): burgundy rug, gold arch, niche and fringe.
+/// Prayer rug with a mihrab arch, drawn as one-colour lines.
 struct PrayerRugIcon: View {
-    private let gold = Color(hex: 0xE4BB68)
-    private let burgundy = Color(hex: 0xB24A62)
     var body: some View {
-        Canvas { ctx, size in
-            let k = min(size.width, size.height) / 64
-            let ox = (size.width - 64 * k) / 2, oy = (size.height - 64 * k) / 2
-            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * k, y: oy + y * k) }
-            var rug = Path()
-            rug.move(to: p(16, 58)); rug.addLine(to: p(16, 20)); rug.addQuadCurve(to: p(32, 4), control: p(16, 6))
-            rug.addQuadCurve(to: p(48, 20), control: p(48, 6)); rug.addLine(to: p(48, 58)); rug.closeSubpath()
-            ctx.fill(rug, with: .color(burgundy))
-            ctx.stroke(rug, with: .color(gold), style: StrokeStyle(lineWidth: 2.4 * k, lineJoin: .round))
-            var arch = Path()
-            arch.move(to: p(22, 52)); arch.addLine(to: p(22, 24)); arch.addQuadCurve(to: p(32, 12), control: p(22, 14))
-            arch.addQuadCurve(to: p(42, 24), control: p(42, 14)); arch.addLine(to: p(42, 52)); arch.closeSubpath()
-            ctx.stroke(arch, with: .color(gold), style: StrokeStyle(lineWidth: 2.2 * k, lineJoin: .round))
-            var niche = Path()
-            niche.move(to: p(27, 52)); niche.addLine(to: p(27, 30)); niche.addQuadCurve(to: p(32, 22), control: p(27, 25))
-            niche.addQuadCurve(to: p(37, 30), control: p(37, 25)); niche.addLine(to: p(37, 52)); niche.closeSubpath()
-            ctx.fill(niche, with: .color(gold.opacity(0.85)))
-            var base = Path(); base.move(to: p(16, 58)); base.addLine(to: p(48, 58))
-            ctx.stroke(base, with: .color(gold), lineWidth: 3 * k)
-            var fringe = Path()
-            for x in [19, 24, 29, 35, 40, 45] as [CGFloat] { fringe.move(to: p(x, 58)); fringe.addLine(to: p(x, 62)) }
-            ctx.stroke(fringe, with: .color(gold), style: StrokeStyle(lineWidth: 1.6 * k, lineCap: .round))
+        GeometryReader { g in
+            let k = min(g.size.width, g.size.height) / 24
+            Path { p in
+                p.move(to: CGPoint(x: 6 * k, y: 21 * k)); p.addLine(to: CGPoint(x: 6 * k, y: 9 * k))
+                p.addArc(center: CGPoint(x: 12 * k, y: 9 * k), radius: 6 * k, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                p.addLine(to: CGPoint(x: 18 * k, y: 21 * k)); p.closeSubpath()
+                p.move(to: CGPoint(x: 9.5 * k, y: 21 * k)); p.addLine(to: CGPoint(x: 9.5 * k, y: 12 * k))
+                p.addArc(center: CGPoint(x: 12 * k, y: 12 * k), radius: 2.5 * k, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                p.addLine(to: CGPoint(x: 14.5 * k, y: 21 * k))
+                p.move(to: CGPoint(x: 5 * k, y: 21 * k)); p.addLine(to: CGPoint(x: 19 * k, y: 21 * k))
+            }
+            .stroke(style: StrokeStyle(lineWidth: 1.6 * k, lineCap: .round, lineJoin: .round))
         }
         .accessibilityHidden(true)
     }

@@ -2,117 +2,121 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
-    @State private var showCities = false
-    @State private var showOffsets = false
-    @State private var showFonts = false
+    @ObservedObject private var fajr = FajrStore.shared
+    @State private var path: [Dest] = []
     @State private var notifDenied = false
     @State private var openHint: String? = nil
     @AppStorage("tempUnit") private var tempUnit = "c"
     @AppStorage("compassStyle") private var compassStyle = "rings"
 
+    /// The six sections of the short main page (easier for older users), plus the pages they open.
+    enum Dest: Hashable { case loc, adhan, fajr, azkar, look, about, cities, offsets, fonts }
+
+    private func sectTitle(_ d: Dest) -> String {
+        switch d {
+        case .loc: return Loc.ar ? "الموقع ومواقيت الصلاة" : L("Location & prayer times")
+        case .adhan: return Loc.ar ? "الأذان والتنبيهات" : L("Adhan & alerts")
+        case .fajr: return Loc.ar ? "منبّه الفجر" : L("Fajr alarm")
+        case .azkar: return Loc.ar ? "الأذكار" : L("Azkhar")
+        case .look: return Loc.ar ? "المظهر واللغة" : L("Appearance & language")
+        default: return Loc.ar ? "حول التطبيق" : L("About")
+        }
+    }
+    private func sectIcon(_ d: Dest) -> String {
+        switch d { case .loc: "mappin.and.ellipse"; case .adhan: "bell"; case .fajr: "alarm"; case .azkar: "hands.sparkles"; case .look: "paintpalette"; default: "info.circle" }
+    }
+    private func summary(_ d: Dest) -> String {
+        let on = { (b: Bool) in b ? (Loc.ar ? "مفعّل" : L("On")) : (Loc.ar ? "متوقف" : L("Off")) }
+        switch d {
+        case .loc: return model.place.name + " · " + L(model.method.name)
+        case .adhan: return on(model.notifOn) + " · " + Notifier.label(model.adhanSound)
+        case .fajr: return fajr.active ? on(true) + " · " + (Loc.ar ? "\(fajr.streak.cur) يومًا متتاليًا" : Loc.f("{0} days in a row", "\(fajr.streak.cur)")) : on(false)
+        case .azkar:
+            let n = [model.azMorning, model.azEvening, model.azPrayer, model.azFriday].filter { $0 }.count
+            return Loc.ar ? "\(n) تذكيرات مفعّلة · حجم الخط" : Loc.f("{0} reminders on · text size", "\(n)")
+        case .look: return AppLang.current.native + " · " + (AppFont.current?.title ?? L("System default"))
+        default: return "Rihal \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))"
+        }
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    PageTitle(en: "Settings", ar: "الإعدادات")
+        NavigationStack(path: $path) {
+            page {
+                PageTitle(en: "Settings", ar: "الإعدادات")
+                group { bigRow(.loc); divider; bigRow(.adhan); divider; bigRow(.fajr) }
+                group { bigRow(.azkar); divider; bigRow(.look) }.padding(.top, 14)
+                group { bigRow(.about) }.padding(.top, 14)
+            }
+            .navigationDestination(for: Dest.self) { d in destination(d) }
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear { refreshNotifStatus() }
+        }
+        .environment(\.layoutDirection, AppLang.current.isRTL ? .rightToLeft : .leftToRight)   // Arabic reads from the right
+    }
 
-                    header(L("theme"))
-                    group {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 14) {
-                                icon("paintpalette")
-                                Text(L("Theme")).font(.sys(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
-                            }
-                            HStack(spacing: 0) {
-                                ForEach(PaletteDef.all) { p in swatch(id: p.id, title: p.title, color: Color(hex: p.swatch)) }
-                            }
-                            .padding(.vertical, 2)
-                            Picker(L("Appearance"), selection: $model.appearance) {
-                                Text(L("Auto")).tag("auto"); Text(L("Light")).tag("light"); Text(L("Dark")).tag("dark")
-                            }
-                            .pickerStyle(.segmented)
-                            HStack(spacing: 14) {
-                                icon("safari")
-                                Text(L("Compass style")).font(.sys(size: 17)).foregroundStyle(Theme.ink)
-                                Spacer()
-                            }
-                            Picker(L("Compass style"), selection: $compassStyle) {
-                                Text(L("Classic")).tag("classic"); Text(L("Rings")).tag("rings")
-                            }
-                            .pickerStyle(.segmented)
-                        }
-                        .padding(.vertical, 14)
-                    }
+    @ViewBuilder private func destination(_ d: Dest) -> some View {
+        switch d {
+        case .cities: CityListView()
+        case .offsets: OffsetsView()
+        case .fonts: FontPickerView()
+        default:
+            page {
+                subHead(d)
+                content(d)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
 
-                    header(L("Language & text"))
-                    group {
-                        // The sample sentence shows the chosen font, size and weight at once.
-                        Text("لَا إِلَٰهَ إِلَّا اللَّهُ مُحَمَّدٌ رَسُولُ اللَّهِ")
-                            .font(.sys(size: 22))
-                            .foregroundStyle(Theme.mintDeep)
-                            .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.6)
-                            .padding(.horizontal, 10).padding(.vertical, 8)
-                            .frame(maxWidth: .infinity, minHeight: 64)
-                            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .padding(.top, 14).padding(.bottom, 6)
-                            .environment(\.layoutDirection, .rightToLeft)
-                        HStack(spacing: 14) {
-                            icon("globe")
-                            title("Application language")
-                            Spacer(minLength: 8)
-                            Menu {
-                                Picker(L("Language"), selection: $model.langID) {
-                                    ForEach(AppLang.all) { Text($0.native).tag($0.id) }
-                                }
-                            } label: { menuValue(AppLang.current.native) }
-                        }.frame(minHeight: 56)
-                        divider
-                        Button { showFonts = true } label: {
-                            HStack(spacing: 14) {
-                                icon("textformat")
-                                title("App font")
-                                Spacer(minLength: 8)
-                                Text(AppFont.current?.title ?? L("System default")).font(.sys(size: 15)).foregroundStyle(Theme.muted)
-                                    .lineLimit(1).minimumScaleFactor(0.7)
-                                Image(systemName: "chevron.forward").font(.sys(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
-                            }
-                            .frame(minHeight: 56).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                        divider
-                        HStack(spacing: 14) {
-                            icon("textformat.size")
-                            title("Text size")
-                            Spacer(minLength: 8)
-                            Menu {
-                                Picker(L("Text size"), selection: $model.textSize) {
-                                    Text(L("Auto (iPhone setting)")).tag("auto")
-                                    Text(L("Standard")).tag("1")
-                                    Text(L("Large")).tag("1.2")
-                                    Text(L("Larger")).tag("1.4")
-                                    Text(L("Largest")).tag("1.6")
-                                }
-                            } label: { menuValue(textSizeName) }
-                        }.frame(minHeight: 56)
-                        divider
-                        HStack(spacing: 14) {
-                            icon("book")
-                            title("Azkhar text size")
-                            Spacer(minLength: 8)
-                            Menu {
-                                Picker(L("Azkhar text size"), selection: $model.azkarSize) {
-                                    Text(L("Standard")).tag("1")
-                                    Text(L("Large")).tag("1.25")
-                                    Text(L("Larger")).tag("1.5")
-                                    Text(L("Largest")).tag("2")
-                                }
-                            } label: { menuValue(azkarSizeName) }
-                        }.frame(minHeight: 56)
-                        divider
-                        toggleRow("bold", "Bold text", $model.boldText)
-                    }
+    private func page<C: View>(@ViewBuilder _ c: () -> C) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8, content: c)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 120)
+        }
+        .scrollIndicators(.hidden)
+        .background(Theme.bg.ignoresSafeArea())
+    }
 
-                    header(L("prayers"))
-                    group {
+    private func subHead(_ d: Dest) -> some View {
+        HStack(spacing: 12) {
+            Button { if !path.isEmpty { path.removeLast() } } label: {
+                Image(systemName: "chevron.backward").font(.sys(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.ink).frame(width: 40, height: 40).background(Theme.tile, in: Circle())
+            }
+            .buttonStyle(.plain)
+            Text(sectTitle(d)).font(.sys(size: 22, weight: .bold, design: Theme.design)).foregroundStyle(Theme.ink)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Spacer()
+        }
+        .padding(.top, 8).padding(.bottom, 6)
+    }
+
+    private func bigRow(_ d: Dest) -> some View {
+        Button { path.append(d) } label: {
+            HStack(spacing: 14) {
+                Image(systemName: sectIcon(d)).font(.sys(size: 21, weight: .medium)).foregroundStyle(Theme.mintDeep)
+                    .frame(width: 46, height: 46).background(Theme.mintDeep.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(sectTitle(d)).font(.sys(size: 18, weight: .bold)).foregroundStyle(Theme.ink).lineLimit(1).minimumScaleFactor(0.7)
+                    Text(summary(d)).font(.sys(size: 13)).foregroundStyle(Theme.muted).lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.forward").font(.sys(size: 14, weight: .semibold)).foregroundStyle(Theme.muted)
+            }
+            .frame(minHeight: 74).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sectionLabel(_ t: String) -> some View {
+        Text(t).font(.sys(size: 15, weight: .bold)).foregroundStyle(Theme.muted).padding(.leading, 6).padding(.top, 14)
+    }
+
+    @ViewBuilder private func content(_ d: Dest) -> some View {
+        switch d {
+        case .loc:
+            group {
                         Button { model.useMyLocation() } label: {
                             HStack(spacing: 14) {
                                 icon("location.fill")
@@ -127,7 +131,7 @@ struct SettingsView: View {
                             .frame(minHeight: 56).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                         divider
-                        Button { showCities = true } label: {
+                        Button { path.append(.cities) } label: {
                             HStack(spacing: 14) {
                                 icon("mappin.and.ellipse")
                                 VStack(alignment: .leading, spacing: 2) {
@@ -157,7 +161,9 @@ struct SettingsView: View {
                         } else if model.usingGPS && model.location.coordinate == nil {
                             Text(L("Finding your location…")).font(.footnote).foregroundStyle(Theme.muted).sideAligned().padding(.bottom, 10)
                         }
-                        divider
+            }
+            sectionLabel(Loc.ar ? "الحساب" : L("Calculation"))
+            group {
                         HStack(spacing: 14) {
                             icon("function")
                             title("Method")
@@ -169,17 +175,14 @@ struct SettingsView: View {
                             } label: { menuValue(shortMethod(model.method.name)) }
                         }.frame(minHeight: 56)
                         divider
-                        Button { showOffsets = true } label: {
-                            row("plusminus.circle", "Adjust times", "minutes", chevron: true)
-                        }
-                        divider
                         toggleRow("sun.max", "Hanafi Asr", $model.hanafi)
                         divider
-                        toggleRow("eye", "Show current prayer (Now)", $model.showNow)
-                    }
-
-                    header(L("Notifications & reminders"))
-                    group {
+                        Button { path.append(.offsets) } label: {
+                            row("plusminus.circle", "Adjust times", "minutes", chevron: true)
+                        }
+            }
+        case .adhan:
+            group {
                         HStack(spacing: 14) {
                             icon("bell")
                             hintTitle("Adhan alerts", key: "alerts")
@@ -221,7 +224,11 @@ struct SettingsView: View {
                         }.frame(minHeight: 56)
                         divider
                         toggleRow("sunrise", "Sunrise alert", $model.notifSunrise)
-                        divider
+            }
+        case .fajr:
+            FajrSettings(fajr: fajr, onAsk: { Notifier.requestAuth { _ in model.rescheduleNotifications() } })
+        case .azkar:
+            group {
                         toggleRow("sun.horizon", Loc.ar ? "تذكير أذكار الصباح" : "Morning azkar reminder", $model.azMorning, hint: "azm")
                         hintText("azm", Loc.ar ? "بعد الفجر بـ١٥ دقيقة، ثم كل ساعتين حتى الظهر. يتوقف عند إكمال أذكار الصباح." : L("15 min after Fajr, then every 2 hours until Dhuhr. Stops once you finish the morning azkar."))
                         divider
@@ -233,10 +240,103 @@ struct SettingsView: View {
                         divider
                         toggleRow("book.closed", Loc.ar ? "تذكير يوم الجمعة" : "Friday reminder", $model.azFriday, hint: "azf")
                         hintText("azf", Loc.ar ? "سورة الكهف قبل الظهر بساعتين ونصف، وساعة الإجابة قبل المغرب بساعة." : L("Surat al-Kahf 2½ hours before Dhuhr, and the hour of dua 1 hour before Maghrib."))
-                    }
-
-                    header(L("units"))
-                    group {
+            }
+            sectionLabel(Loc.ar ? "القراءة" : L("Reading"))
+            group {
+                        HStack(spacing: 14) {
+                            icon("book")
+                            title("Azkhar text size")
+                            Spacer(minLength: 8)
+                            Menu {
+                                Picker(L("Azkhar text size"), selection: $model.azkarSize) {
+                                    Text(L("Standard")).tag("1")
+                                    Text(L("Large")).tag("1.25")
+                                    Text(L("Larger")).tag("1.5")
+                                    Text(L("Largest")).tag("2")
+                                }
+                            } label: { menuValue(azkarSizeName) }
+                        }.frame(minHeight: 56)
+            }
+        case .look:
+            group {
+                        Text("لَا إِلَٰهَ إِلَّا اللَّهُ مُحَمَّدٌ رَسُولُ اللَّهِ")
+                            .font(.sys(size: 22))
+                            .foregroundStyle(Theme.mintDeep)
+                            .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.6)
+                            .padding(.horizontal, 10).padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, minHeight: 64)
+                            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .padding(.top, 14).padding(.bottom, 6)
+                            .environment(\.layoutDirection, .rightToLeft)
+                        HStack(spacing: 14) {
+                            icon("globe")
+                            title("Application language")
+                            Spacer(minLength: 8)
+                            Menu {
+                                Picker(L("Language"), selection: $model.langID) {
+                                    ForEach(AppLang.all) { Text($0.native).tag($0.id) }
+                                }
+                            } label: { menuValue(AppLang.current.native) }
+                        }.frame(minHeight: 56)
+                        divider
+                        HStack(spacing: 14) {
+                            icon("textformat.size")
+                            title("Text size")
+                            Spacer(minLength: 8)
+                            Menu {
+                                Picker(L("Text size"), selection: $model.textSize) {
+                                    Text(L("Auto (iPhone setting)")).tag("auto")
+                                    Text(L("Standard")).tag("1")
+                                    Text(L("Large")).tag("1.2")
+                                    Text(L("Larger")).tag("1.4")
+                                    Text(L("Largest")).tag("1.6")
+                                }
+                            } label: { menuValue(textSizeName) }
+                        }.frame(minHeight: 56)
+                        divider
+                        toggleRow("bold", "Bold text", $model.boldText)
+            }
+            sectionLabel(Loc.ar ? "الألوان" : L("Colours"))
+            group {
+                VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 0) {
+                                ForEach(PaletteDef.all) { p in swatch(id: p.id, title: p.title, color: Color(hex: p.swatch)) }
+                            }
+                            .padding(.vertical, 2)
+                            Picker(L("Appearance"), selection: $model.appearance) {
+                                Text(L("Auto")).tag("auto"); Text(L("Light")).tag("light"); Text(L("Dark")).tag("dark")
+                            }
+                            .pickerStyle(.segmented)
+                }
+                .padding(.vertical, 14)
+            }
+            sectionLabel(Loc.ar ? "المزيد" : L("More"))
+            group {
+                        Button { path.append(.fonts) } label: {
+                            HStack(spacing: 14) {
+                                icon("textformat")
+                                title("App font")
+                                Spacer(minLength: 8)
+                                Text(AppFont.current?.title ?? L("System default")).font(.sys(size: 15)).foregroundStyle(Theme.muted)
+                                    .lineLimit(1).minimumScaleFactor(0.7)
+                                Image(systemName: "chevron.forward").font(.sys(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
+                            }
+                            .frame(minHeight: 56).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                        divider
+                        toggleRow("eye", "Show current prayer (Now)", $model.showNow)
+                        divider
+                        HStack(spacing: 14) {
+                            icon("safari")
+                            title("Compass style")
+                            Spacer(minLength: 8)
+                            Menu {
+                                Picker(L("Compass style"), selection: $compassStyle) {
+                                    Text(L("Classic")).tag("classic"); Text(L("Rings")).tag("rings")
+                                }
+                            } label: { menuValue(compassStyle == "rings" ? L("Rings") : L("Classic")) }
+                        }.frame(minHeight: 56)
+                        divider
                         HStack(spacing: 14) {
                             icon("thermometer.medium")
                             title("Temperature")
@@ -248,29 +348,15 @@ struct SettingsView: View {
                                 }
                             } label: { menuValue(tempUnit == "f" ? "°F" : "°C") }
                         }.frame(minHeight: 56)
-                    }
-
-                    group {
-                        row("info.circle", "About", "Rihal \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))", chevron: false)
-                    }
-                    .padding(.top, 14)
-
-                    Text(L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities."))
-                        .font(.sys(size: 12)).foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity).multilineTextAlignment(.center).padding(.top, 8)
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 120)
             }
-            .scrollIndicators(.hidden)
-            .background(Theme.bg.ignoresSafeArea())
-            .navigationDestination(isPresented: $showCities) { CityListView() }
-            .navigationDestination(isPresented: $showOffsets) { OffsetsView() }
-            .navigationDestination(isPresented: $showFonts) { FontPickerView() }
-            .toolbar(.hidden, for: .navigationBar)
-            .onAppear { refreshNotifStatus() }
+        default:
+            group {
+                row("info.circle", Loc.ar ? "الإصدار" : "Version", "Rihal \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))", chevron: false)
+            }
+            Text(L("Qibla and prayer times are calculated on this device. Your approximate location is sent only when you look up mosques, weather or cities."))
+                .font(.sys(size: 12)).foregroundStyle(Theme.muted)
+                .frame(maxWidth: .infinity).multilineTextAlignment(.center).padding(.top, 8)
         }
-        .environment(\.layoutDirection, AppLang.current.isRTL ? .rightToLeft : .leftToRight)   // Arabic reads from the right
     }
 
     // MARK: pieces

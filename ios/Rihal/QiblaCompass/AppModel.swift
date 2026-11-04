@@ -65,6 +65,7 @@ final class AppModel: ObservableObject {
         }.store(in: &bag)
         refreshLocation()
         // A finished (or reset) azkar set changes today's reminders; wait a moment so a run of taps rebuilds once.
+        FajrStore.shared.onChange = { [weak self] in self?.rescheduleNotifications() }
         AzkarStore.shared.onSetChange = { [weak self] in
             self?.pendingReschedule?.cancel()
             let w = DispatchWorkItem { self?.rescheduleNotifications() }
@@ -172,9 +173,12 @@ final class AppModel: ObservableObject {
         return "\(notifOn)|\(notifBefore)|\(mutes)|\(methodID)|\(hanafi)|\(offs)|\(String(format: "%.1f,%.1f", p.lat, p.lon))|\(AppLang.current.id)|\(adhanSound)|\(fajrSound)|\(azMorning)\(azEvening)\(azPrayer)\(azFriday)"
     }
     func rescheduleNotifications() {
+        UserDefaults.standard.set(place.tz, forKey: "lastPlaceTZ")
+        let fajr = FajrStore.shared.requests(place: place, method: method, hanafi: hanafi, soundFile: Notifier.file(fajrSound) + ".caf")
         Notifier.schedule(place: place, method: method, hanafi: hanafi, on: notifOn, before: notifBefore,
                           muted: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, isMuted($0)) }),
                           alarm: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, isAlarm($0)) }),
-                          opt: .init(sound: adhanSound, fajrSound: fajrSound, morning: azMorning, evening: azEvening, afterPrayer: azPrayer, friday: azFriday))
+                          opt: .init(sound: adhanSound, fajrSound: fajrSound, morning: azMorning, evening: azEvening, afterPrayer: azPrayer, friday: azFriday),
+                          fajr: fajr)
     }
 }

@@ -3,6 +3,7 @@ import Combine
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
+    @ObservedObject private var fajr = FajrStore.shared
     @Environment(\.scenePhase) private var phase
 
     private var viewID: String {
@@ -63,6 +64,7 @@ struct RootView: View {
                 if let t = model.leftAt, Date().timeIntervalSince(t) > 300, AzkarStore.shared.openRequest == nil { model.tab = 0 }
                 model.leftAt = nil
                 AzkarStore.shared.sync(place: model.place, method: model.method, hanafi: model.hanafi)
+                FajrStore.shared.sync(place: model.place, method: model.method, hanafi: model.hanafi)
                 model.refreshLocation(); model.rescheduleNotifications(); model.refreshWeather()
                 if model.tab == 0 || model.tab == 1 { model.location.startHeading() }
             } else if p == .background {
@@ -72,6 +74,9 @@ struct RootView: View {
         }
         .onChange(of: model.location.coordinate?.latitude) { _, _ in model.refreshWeather() }
         .onChange(of: model.notifKey) { _, _ in model.rescheduleNotifications() }
+        // Fajr rug alarm screens (alarm, camera, rug setup, done)
+        .fullScreenCover(item: $fajr.screen) { s in FajrAlarmView(screen: s).environmentObject(model) }
+        .onAppear { FajrStore.shared.sync(place: model.place, method: model.method, hanafi: model.hanafi) }
         // A tapped azkar reminder opens the Azkar tab (the list itself opens there); the Kahf button opens the Mushaf.
         .onReceive(AzkarStore.shared.$openRequest) { r in
             guard r != nil else { return }

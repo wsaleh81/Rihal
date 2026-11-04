@@ -64,10 +64,12 @@ enum Notifier {
     /// Each prayer has two switches: the notification (bell) and the alarm (adhan sound).
     /// Alarm on: the alert plays the adhan. Alarm off, bell on: a normal notification. Both off: nothing.
     /// Azkar reminders (same timings as the Android app) are added after the prayer alerts; iPhone keeps 64 at most.
-    static func schedule(place: Place, method: CalcMethod, hanafi: Bool, on: Bool, before: Int, muted: [Prayer: Bool], alarm: [Prayer: Bool], opt: Options = Options()) {
+    static func schedule(place: Place, method: CalcMethod, hanafi: Bool, on: Bool, before: Int, muted: [Prayer: Bool], alarm: [Prayer: Bool], opt: Options = Options(), fajr: [UNNotificationRequest] = []) {
         let center = UNUserNotificationCenter.current()
         center.removeAllPendingNotificationRequests()
+        fajr.forEach { center.add($0) }                  // the Fajr rug alarm works even with adhan alerts off
         guard on else { return }
+        let alarmFajrs = FajrStore.shared.alarmTimes
         let now = Date()
         var items: [(Date, Prayer, Bool)] = []          // date, prayer, isReminder
         for day in 0..<7 {
@@ -75,7 +77,7 @@ enum Notifier {
             let ev = PrayerCalculator.events(around: d, lat: place.lat, lon: place.lon, timeZone: place.timeZone,
                                              method: method, hanafi: hanafi).today
             for (p, t) in ev where muted[p] != true || alarm[p] == true {
-                if t > now { items.append((t, p, false)) }
+                if t > now, !(p == .fajr && alarmFajrs.contains(Int(t.timeIntervalSince1970))) { items.append((t, p, false)) }
                 if before > 0, p != .sunrise {
                     let r = t.addingTimeInterval(-Double(before) * 60)
                     if r > now { items.append((r, p, true)) }
@@ -91,7 +93,7 @@ enum Notifier {
             comps.timeZone = place.timeZone
             center.add(UNNotificationRequest(identifier: id, content: c, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
         }
-        for (t, p, reminder) in items.prefix(64 - azkar.count) {
+        for (t, p, reminder) in items.prefix(max(0, 64 - azkar.count - fajr.count)) {
             let c = UNMutableNotificationContent()
             let when = reminder ? t.addingTimeInterval(Double(before) * 60) : t
             c.title = Loc.ar && p != .sunrise ? "صلاة \(p.name)" : p.name
@@ -164,13 +166,18 @@ final class NotifDelegate: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotifDelegate()
     func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification,
                                 withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) {
+        if let t = n.request.content.userInfo["fajr"] as? Double {
+            DispatchQueue.main.async { FajrStore.shared.ring(Date(timeIntervalSince1970: t)) }
+        }
         h([.banner, .sound])
     }
     /// Tapping an azkar reminder opens that list.
     func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse, withCompletionHandler h: @escaping () -> Void) {
-        if let cat = r.notification.request.content.userInfo["azcat"] as? String {
+        let info = r.notification.request.content.userInfo
+        if let cat = info["azcat"] as? String {
             DispatchQueue.main.async { AzkarStore.shared.openRequest = cat }
         }
+        if let t = info["fajr"] as? Double { DispatchQueue.main.async { FajrStore.shared.ring(Date(timeIntervalSince1970: t)) } }
         h()
     }
 }

@@ -22,10 +22,10 @@ enum AzkharCategory: String, CaseIterable, Identifiable {
     var arabicTitle: String { title("ar") }
     var icon: String {
         switch self {
-        case .morning: "sunrise.fill"
-        case .evening: "sunset.fill"
+        case .morning: "sunrise"
+        case .evening: "sunset"
         case .afterPrayer: "hands.sparkles.fill"
-        case .sleep: "moon.stars.fill"
+        case .sleep: "moon.stars"
         case .travel: "airplane"
         }
     }
@@ -38,7 +38,7 @@ struct CatIcon: View {
         if cat == .afterPrayer {
             Image("DuaSolid").renderingMode(.template).resizable().scaledToFit().frame(width: size * 1.1, height: size * 1.1)
         } else {
-            Image(systemName: cat.icon).font(.sys(size: size, weight: .semibold))
+            Image(systemName: cat.icon).font(.sys(size: size, weight: .regular))
         }
     }
 }
@@ -155,7 +155,7 @@ struct AzkharCollectionsView: View {
             showMore = true
         } label: {
             centredTile(items: MoreAzkar.groups.flatMap { $0.items.map { (id: $0.id, times: $0.n) } }) {
-                Text("📚").font(.system(size: 28))
+                Image(systemName: "books.vertical").font(.sys(size: 26, weight: .regular)).foregroundStyle(Theme.mintDeep)
                     .frame(width: 52, height: 52)
                     .background(Theme.mintDeep.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             } title: {

@@ -333,6 +333,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Rihal;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Rihal uses the camera only to photograph your prayer rug for the Fajr alarm. The photo stays on your phone.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rihal uses your location to work out the Qibla direction and your prayer times, and to find nearby mosques and the weather.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -362,6 +363,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Rihal;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Rihal uses the camera only to photograph your prayer rug for the Fajr alarm. The photo stays on your phone.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rihal uses your location to work out the Qibla direction and your prayer times, and to find nearby mosques and the weather.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

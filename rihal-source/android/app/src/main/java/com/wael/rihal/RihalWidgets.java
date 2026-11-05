@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -44,7 +45,14 @@ final class RihalWidgets {
 
     static final class Ev { long t; String ar, name, hm; }
 
+    /** Widget colours: the app's chosen palette, light or dark (default: Ocean dark, the original navy and gold). */
+    static final class Look {
+        int bg = 0xFF12224D, line = 0xFF2B4080, accent = 0xFFE4BB68, deep = 0xFFF1D9A2, ink = 0xFFF5F0E4, muted = 0xFFA9B2CC;
+        boolean dark = true;
+    }
+
     static final class Data {
+        Look look = new Look();
         String lang = "en";
         String city = "";
         final List<Ev> events = new ArrayList<>();
@@ -57,6 +65,19 @@ final class RihalWidgets {
 
     static void save(Context c, String json) {
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, json).apply();
+    }
+
+    private static int col(JSONObject o, String k, int def) {
+        try { return 0xFF000000 | Integer.parseInt(o.getString(k).replace("#", ""), 16); } catch (Exception e) { return def; }
+    }
+
+    /** Background, glow, card and text colours for the chosen look. */
+    private static void paint(RemoteViews v, Look l, int... muted) {
+        v.setInt(R.id.w_bg, "setColorFilter", l.bg);
+        v.setImageViewResource(R.id.w_glow, l.dark ? R.drawable.widget_glow_dark : R.drawable.widget_glow_light);
+        v.setTextColor(R.id.w_ar, l.deep);
+        v.setTextColor(R.id.w_chrono, l.ink);
+        for (int id : muted) v.setTextColor(id, l.muted);
     }
 
     static Data load(Context c) {
@@ -80,6 +101,20 @@ final class RihalWidgets {
                     d.events.add(v);
                 }
             }
+            JSONObject th = o.optJSONObject("theme");
+            if (th != null) {
+                String mode = th.optString("mode", "auto");
+                boolean night = (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+                boolean dark = "dark".equals(mode) || ("auto".equals(mode) && night);
+                JSONObject t = th.optJSONObject(dark ? "dark" : "light");
+                if (t != null) {
+                    Look l = new Look();
+                    l.dark = dark;
+                    l.bg = col(t, "bg", l.bg); l.line = col(t, "line", l.line); l.accent = col(t, "accent", l.accent);
+                    l.deep = col(t, "deep", l.deep); l.ink = col(t, "ink", l.ink); l.muted = col(t, "muted", l.muted);
+                    d.look = l;
+                }
+            }
             JSONObject m = o.optJSONObject("mosque");
             if (m != null) {
                 d.mosque = m.optString("name", null);
@@ -96,7 +131,7 @@ final class RihalWidgets {
         long now = System.currentTimeMillis();
         int[] sq = m.getAppWidgetIds(new ComponentName(c, RihalSquareWidget.class));
         int[] rc = m.getAppWidgetIds(new ComponentName(c, RihalRectWidget.class));
-        for (int id : sq) m.updateAppWidget(id, fitInsideRing(c, square(c, d, now), m.getAppWidgetOptions(id), progress(d, now)));
+        for (int id : sq) m.updateAppWidget(id, fitInsideRing(c, square(c, d, now), m.getAppWidgetOptions(id), progress(d, now), d.look));
         for (int id : rc) m.updateAppWidget(id, rect(c, d, now));
         schedule(c, d, now, sq.length + rc.length > 0);
     }
@@ -150,21 +185,22 @@ final class RihalWidgets {
             v.setViewVisibility(R.id.w_chrono, View.GONE);
             v.setTextViewText(R.id.w_sub, d.ar() ? "افتح التطبيق" : "Open Rihal");
         }
+        paint(v, d.look, R.id.w_label, R.id.w_sub);
         v.setOnClickPendingIntent(R.id.w_root, open(c, 0));
         return v;
     }
 
     /** Keep the text block inside the ring whatever size the widget is resized to. */
-    static RemoteViews fitInsideRing(Context c, RemoteViews v, Bundle o, float progress) {
+    static RemoteViews fitInsideRing(Context c, RemoteViews v, Bundle o, float progress, Look l) {
         int wDp = o != null ? o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) : 0;
         int hDp = o != null ? o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) : 0;
-        if (wDp <= 0 || hDp <= 0) { v.setImageViewBitmap(R.id.w_ring, ring(progress, 240)); return v; }
+        if (wDp <= 0 || hDp <= 0) { v.setImageViewBitmap(R.id.w_ring, ring(progress, 240, l)); return v; }
         float dp = c.getResources().getDisplayMetrics().density;
         float w = (wDp - 16) * dp, h = (hDp - 16) * dp, side = Math.min(w, h);
         int inset = Math.round(side * 0.2f);
         int px = Math.round((w - side) / 2f) + inset, py = Math.round((h - side) / 2f) + inset;
         v.setViewPadding(R.id.w_inner, px, py, px, py);
-        v.setImageViewBitmap(R.id.w_ring, ring(progress, Math.round(Math.max(160, Math.min(360, side))))); // sharp at any size
+        v.setImageViewBitmap(R.id.w_ring, ring(progress, Math.round(Math.max(160, Math.min(360, side))), l)); // sharp at any size
         return v;
     }
 
@@ -188,6 +224,11 @@ final class RihalWidgets {
             v.setTextViewText(R.id.w_mname, d.city.isEmpty() ? "—" : d.city);
             v.setTextViewText(R.id.w_mdist, d.ar() ? "لا يوجد مسجد قريب" : "No mosque found yet");
         }
+        paint(v, d.look, R.id.w_mlabel, R.id.w_mdist);
+        v.setTextColor(R.id.w_chrono, d.look.muted);
+        v.setTextColor(R.id.w_time, d.look.ink);
+        v.setTextColor(R.id.w_mname, d.look.ink);
+        v.setInt(R.id.w_card, "setBackgroundResource", d.look.dark ? R.drawable.widget_card : R.drawable.widget_card_light);
         v.setOnClickPendingIntent(R.id.w_left, open(c, 0));
         v.setOnClickPendingIntent(R.id.w_card, open(c, 1));
         return v;
@@ -203,8 +244,8 @@ final class RihalWidgets {
         return d + " · " + walk + " min walk";
     }
 
-    /** Countdown ring: faint track plus a gold arc from the top, clockwise. */
-    static Bitmap ring(float progress, int size) {
+    /** Countdown ring: faint track plus an arc in the app's colour from the top, clockwise. */
+    static Bitmap ring(float progress, int size, Look l) {
         float stroke = size * 0.055f;
         Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(b);
@@ -212,13 +253,13 @@ final class RihalWidgets {
         Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
         track.setStyle(Paint.Style.STROKE);
         track.setStrokeWidth(stroke);
-        track.setColor(Color.argb(26, 255, 255, 255));
+        track.setColor(l.dark ? Color.argb(26, 255, 255, 255) : (l.line & 0x00FFFFFF) | 0xB0000000);
         cv.drawOval(r, track);
         Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
         arc.setStyle(Paint.Style.STROKE);
         arc.setStrokeWidth(stroke);
         arc.setStrokeCap(Paint.Cap.ROUND);
-        SweepGradient g = new SweepGradient(size / 2f, size / 2f, new int[]{GOLD_300, GOLD_DEEP, GOLD_300}, null);
+        SweepGradient g = new SweepGradient(size / 2f, size / 2f, l.dark ? new int[]{l.deep, l.accent, l.deep} : new int[]{l.accent, l.deep, l.accent}, null);
         Matrix mx = new Matrix();
         mx.setRotate(-90, size / 2f, size / 2f);
         g.setLocalMatrix(mx);

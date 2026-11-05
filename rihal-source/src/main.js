@@ -143,6 +143,12 @@ let nativeOn = false;
 // Android home-screen widgets (RihalWidgetPlugin.java): the app hands over the coming prayer times and the nearest mosque.
 const NativeWidget = Capacitor.getPlatform() === "android" ? registerPlugin("RihalWidget") : null;
 let widgetSig = "", widgetTimer = null;
+// The widgets use the app's chosen colours: both the light and the dark set, so "Auto" can follow the phone.
+function widgetTheme() {
+  const pal = (PALETTES.find(x => x.id === S.palette) || PALETTES[0]).c, hx = n => "#" + n.toString(16).padStart(6, "0");
+  const set = k => ({ bg: hx(k ? pal.card[1] : pal.tint[0]), line: hx(pal.line[k]), accent: hx(pal.accent[k]), deep: hx(pal.deep[k]), ink: hx(pal.ink[k]), muted: hx(pal.muted[k]) });
+  return { mode: S.appearance || "auto", dark: set(1), light: set(0) };
+}
 function pushWidget() {
   if (!NativeWidget) return;
   clearTimeout(widgetTimer);
@@ -156,6 +162,7 @@ function pushWidget() {
       lang: S.lang, city: p.name,
       events: ev.map(e => ({ t: e.date, ar: PNAME_AR[e.prayer], name: ar() ? PNAME_EN[e.prayer] : pName(e.prayer), hm: clock(e.date, p.tz) })),
       mosque: m ? { name: m.name, d: Math.round(m.d) } : null,
+      theme: widgetTheme(),
     };
     const sig = JSON.stringify(data);
     if (sig === widgetSig) return;
